@@ -290,8 +290,8 @@ void CScene::UpdateLevel2Camera()
 	if (pLevel2Camera)
 	{
 		const float fTankModelYawOffset = 180.0f;
-		const float fCameraDistance = 90.0f;
-		const float fCameraHeight = 35.0f;
+		const float fCameraDistance = 50.0f;
+		const float fCameraHeight = 30.0f;
 		const float fLookAtHeight = 8.0f;
 		float fVisualYawRadians = XMConvertToRadians(m_fLevel2PlayerYaw + fTankModelYawOffset);
 		XMFLOAT3 xmf3TankVisualForward = XMFLOAT3(sinf(fVisualYawRadians), 0.0f, cosf(fVisualYawRadians));
