@@ -174,6 +174,8 @@ private:
 	void UpdateLevel2EnemyFire(float fTimeElapsed);
 	void UpdateLevel2AutoAttack(float fTimeElapsed);
 	void CheckLevel2ProjectileEnemyCollisions();
+	void CheckLevel2ProjectileObstacleCollisions();
+	bool IsLevel2PlayerCollidingWithObstacle();
 	void CheckLevel2EnemyProjectilePlayerCollisions();
 	void ApplyDamageToLevel2Player(int nDamage);
 	void DestroyLevel2EnemyTank(int nEnemyIndex);

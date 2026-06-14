@@ -320,9 +320,11 @@ bool CScene::ProcessLevel2Input(UCHAR *pKeysBuffer)
 	if (Vector3::Length(xmf3MoveDirection) > 0.001f)
 	{
 		const float fMoveSpeed = 42.0f;
+		XMFLOAT3 xmf3OldPosition = m_xmf3Level2PlayerPosition;
 		xmf3MoveDirection = Vector3::Normalize(xmf3MoveDirection);
 		m_xmf3Level2PlayerPosition = Vector3::Add(m_xmf3Level2PlayerPosition, Vector3::ScalarProduct(xmf3MoveDirection, fMoveSpeed * m_fElapsedTime, false));
 		m_xmf3Level2PlayerPosition.y = m_pLevel2Terrain->GetHeight(m_xmf3Level2PlayerPosition.x, m_xmf3Level2PlayerPosition.z) + 3.0f;
+		if (IsLevel2PlayerCollidingWithObstacle()) m_xmf3Level2PlayerPosition = xmf3OldPosition;
 		UpdateLevel2PlayerTankTransform(true);
 		UpdateLevel2Camera();
 	}
@@ -1027,7 +1029,7 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 		float x = -430.0f + fColumn * 95.0f + (float)((i * 17) % 31 - 15);
 		float z = -470.0f + fRow * 190.0f + (float)((i * 23) % 47 - 23);
 		float y = (m_pLevel2Terrain) ? m_pLevel2Terrain->GetHeight(x, z) : 0.0f;
-		float fScale = bTree ? (0.78f + (float)(i % 5) * 0.08f) : (0.72f + (float)(i % 4) * 0.10f);
+		float fScale = bTree ? (2.60f + (float)(i % 5) * 0.18f) : (2.40f + (float)(i % 4) * 0.22f);
 		float fYaw = fmodf((float)(i * 43), 360.0f);
 
 		int nMeshesInHierarchy = 0;
@@ -1043,6 +1045,62 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 	}
 }
 
+bool CScene::IsLevel2PlayerCollidingWithObstacle()
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || !m_ppLevel2Obstacles) return(false);
+
+	const float fPlayerRadius = 12.0f;
+	for (int i = 0; i < m_nLevel2Obstacles; i++)
+	{
+		if (!m_ppLevel2Obstacles[i]) continue;
+
+		bool bTree = ((i % 3) != 0);
+		float fObstacleRadius = bTree ? (15.0f + (float)(i % 5) * 1.5f) : (18.0f + (float)(i % 4) * 2.0f);
+		XMFLOAT3 xmf3ObstaclePosition = m_ppLevel2Obstacles[i]->GetPosition();
+		float dx = m_xmf3Level2PlayerPosition.x - xmf3ObstaclePosition.x;
+		float dz = m_xmf3Level2PlayerPosition.z - xmf3ObstaclePosition.z;
+		float fHitDistance = fPlayerRadius + fObstacleRadius;
+		if ((dx * dx + dz * dz) <= (fHitDistance * fHitDistance)) return(true);
+	}
+	return(false);
+}
+
+void CScene::CheckLevel2ProjectileObstacleCollisions()
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_ppLevel2Obstacles) return;
+
+	CProjectileObject **ppProjectileArrays[2] = { m_ppLevel2Projectiles, m_ppLevel2EnemyProjectiles };
+	int pnProjectileCounts[2] = { m_nLevel2Projectiles, m_nLevel2EnemyProjectiles };
+	for (int nArray = 0; nArray < 2; nArray++)
+	{
+		CProjectileObject **ppProjectiles = ppProjectileArrays[nArray];
+		if (!ppProjectiles) continue;
+		for (int i = 0; i < pnProjectileCounts[nArray]; i++)
+		{
+			CProjectileObject *pProjectile = ppProjectiles[i];
+			if (!pProjectile || !pProjectile->IsActive()) continue;
+
+			XMFLOAT3 xmf3ProjectilePosition = pProjectile->GetPosition();
+			for (int j = 0; j < m_nLevel2Obstacles; j++)
+			{
+				if (!m_ppLevel2Obstacles[j]) continue;
+
+				bool bTree = ((j % 3) != 0);
+				float fObstacleRadius = bTree ? (15.0f + (float)(j % 5) * 1.5f) : (18.0f + (float)(j % 4) * 2.0f);
+				XMFLOAT3 xmf3ObstaclePosition = m_ppLevel2Obstacles[j]->GetPosition();
+				float dx = xmf3ProjectilePosition.x - xmf3ObstaclePosition.x;
+				float dz = xmf3ProjectilePosition.z - xmf3ObstaclePosition.z;
+				float fHitDistance = pProjectile->GetCollisionRadius() + fObstacleRadius;
+				if ((dx * dx + dz * dz) <= (fHitDistance * fHitDistance))
+				{
+					SpawnLevel1HitEffect(xmf3ProjectilePosition);
+					pProjectile->Reset();
+					break;
+				}
+			}
+		}
+	}
+}
 void CScene::UpdateLevel2Objects(float fTimeElapsed)
 {
 	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_pPlayer || !m_ppLevel2EnemyTanks) return;
@@ -1328,15 +1386,12 @@ void CScene::FireLevel2PlayerProjectileAtTarget(int nTargetIndex)
 	if (!pProjectile) return;
 
 	XMFLOAT3 xmf3TargetPosition = m_ppLevel2EnemyTanks[nTargetIndex]->GetPosition();
-	XMFLOAT3 xmf3Direction = Vector3::Subtract(xmf3TargetPosition, m_xmf3Level2PlayerPosition);
-	xmf3Direction.y = 0.0f;
+	xmf3TargetPosition.y += 6.0f;
+	XMFLOAT3 xmf3StartPosition = m_xmf3Level2PlayerPosition;
+	xmf3StartPosition.y += 6.0f;
+	XMFLOAT3 xmf3Direction = Vector3::Subtract(xmf3TargetPosition, xmf3StartPosition);
 	if (Vector3::Length(xmf3Direction) <= 0.001f) return;
 	xmf3Direction = Vector3::Normalize(xmf3Direction);
-
-	const float fMuzzleForwardOffset = 14.0f;
-	const float fMuzzleHeightOffset = 6.0f;
-	XMFLOAT3 xmf3StartPosition = Vector3::Add(m_xmf3Level2PlayerPosition, Vector3::ScalarProduct(xmf3Direction, fMuzzleForwardOffset, false));
-	xmf3StartPosition.y += fMuzzleHeightOffset;
 	pProjectile->Fire(xmf3StartPosition, xmf3Direction);
 }
 
@@ -1374,9 +1429,16 @@ void CScene::UpdateLevel2EnemyFire(float fTimeElapsed)
 	m_fLevel2EnemyFireCooldown -= fTimeElapsed;
 	if (m_fLevel2EnemyFireCooldown > 0.0f) return;
 
+	const float fFireRange = 280.0f;
+	const float fFireRangeSq = fFireRange * fFireRange;
 	for (int i = 0; i < m_nLevel2EnemyTanks; i++)
 	{
-		if (m_ppLevel2EnemyTanks[i] && m_pbLevel2EnemyTankAlive[i]) FireLevel2EnemyProjectile(i);
+		if (!m_ppLevel2EnemyTanks[i] || !m_pbLevel2EnemyTankAlive[i]) continue;
+
+		XMFLOAT3 xmf3EnemyPosition = m_ppLevel2EnemyTanks[i]->GetPosition();
+		float dx = m_xmf3Level2PlayerPosition.x - xmf3EnemyPosition.x;
+		float dz = m_xmf3Level2PlayerPosition.z - xmf3EnemyPosition.z;
+		if ((dx * dx + dz * dz) <= fFireRangeSq) FireLevel2EnemyProjectile(i);
 	}
 	m_fLevel2EnemyFireCooldown = 1.8f;
 }
@@ -2481,6 +2543,7 @@ void CScene::AnimateObjects(float fTimeElapsed)
 		{
 			UpdateLevel2EnemyFire(fTimeElapsed);
 			UpdateLevel2AutoAttack(fTimeElapsed);
+			CheckLevel2ProjectileObstacleCollisions();
 			CheckLevel2ProjectileEnemyCollisions();
 			CheckLevel2EnemyProjectilePlayerCollisions();
 		}
@@ -2489,6 +2552,7 @@ void CScene::AnimateObjects(float fTimeElapsed)
 		{
 			m_fLevel2ClearElapsedTime += fTimeElapsed;
 			UpdateLevel2YouWinText();
+			if (m_fLevel2ClearElapsedTime >= 2.0f) SetSceneMode(GAME_SCENE_LEVEL3);
 		}
 	}
 
