@@ -118,7 +118,7 @@ public:
 	virtual ~CGameObject();
 
 public:
-	char							m_pstrFrameName[64];
+	char							m_pstrFrameName[64]{};
 
 	CMesh							*m_pMesh = NULL;
 

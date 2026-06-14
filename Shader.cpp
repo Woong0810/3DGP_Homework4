@@ -268,7 +268,7 @@ D3D12_SHADER_BYTECODE CIlluminatedShader::CreatePixelShader()
 void CIlluminatedShader::CreateShader(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList, ID3D12RootSignature *pd3dGraphicsRootSignature)
 {
 	m_nPipelineStates = 2;
-	m_ppd3dPipelineStates = new ID3D12PipelineState*[m_nPipelineStates];
+	m_ppd3dPipelineStates = new ID3D12PipelineState*[m_nPipelineStates]{};
 
 	CShader::CreateShader(pd3dDevice, pd3dCommandList, pd3dGraphicsRootSignature);
 
