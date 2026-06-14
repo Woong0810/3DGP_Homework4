@@ -222,8 +222,7 @@ bool CScene::ProcessLevel2Input(UCHAR *pKeysBuffer)
 	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || !m_pLevel2PlayerTank || !m_pLevel2Terrain || !m_pPlayer) return(false);
 
 	XMFLOAT3 xmf3MoveDirection = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	const float fTankModelYawOffset = 180.0f;
-	float fYawRadians = XMConvertToRadians(m_fLevel2PlayerYaw + fTankModelYawOffset);
+	float fYawRadians = XMConvertToRadians(m_fLevel2PlayerYaw);
 	XMFLOAT3 xmf3Forward = XMFLOAT3(sinf(fYawRadians), 0.0f, cosf(fYawRadians));
 	XMFLOAT3 xmf3Right = XMFLOAT3(cosf(fYawRadians), 0.0f, -sinf(fYawRadians));
 
@@ -271,7 +270,7 @@ void CScene::UpdateLevel2PlayerTankTransform()
 	m_pLevel2PlayerTank->SetPosition(m_xmf3Level2PlayerPosition);
 
 	m_pPlayer->ResetOrientation();
-	m_pPlayer->Rotate(0.0f, m_fLevel2PlayerYaw + fTankModelYawOffset, 0.0f);
+	m_pPlayer->Rotate(0.0f, m_fLevel2PlayerYaw, 0.0f);
 	m_pPlayer->SetPosition(m_xmf3Level2PlayerPosition);
 	m_pPlayer->SetVelocity(XMFLOAT3(0.0f, 0.0f, 0.0f));
 }
