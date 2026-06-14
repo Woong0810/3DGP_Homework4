@@ -101,6 +101,7 @@ public:
 
 	bool ProcessInput(UCHAR *pKeysBuffer);
 	bool IsLevelPlaying() const { return(m_nSceneMode >= GAME_SCENE_TUTORIAL); }
+	bool IsLevel2Mode() const { return(m_nSceneMode == GAME_SCENE_LEVEL2); }
 	bool IsLevel1Cleared() const { return(m_bLevel1Cleared); }
 	bool IsLevel1Failed() const { return(m_bLevel1Failed); }
 	bool ShouldRenderMainPlayer() const { return((m_nSceneMode != GAME_SCENE_LEVEL2) && ((m_nSceneMode != GAME_SCENE_LEVEL3) || (!m_bLevel3Cleared && !m_bLevel3Failed))); }
