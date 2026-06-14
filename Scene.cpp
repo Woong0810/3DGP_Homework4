@@ -262,7 +262,7 @@ void CScene::RotateLevel2PlayerTank(float fYawDelta)
 	if (m_fLevel2PlayerYaw > 360.0f) m_fLevel2PlayerYaw -= 360.0f;
 	if (m_fLevel2PlayerYaw < -360.0f) m_fLevel2PlayerYaw += 360.0f;
 	UpdateLevel2PlayerTankTransform(false);
-	UpdateLevel2Camera();
+	UpdateLevel2CameraLookOnly();
 }
 
 void CScene::UpdateLevel2PlayerTankTransform(bool bSyncMainPlayerPosition)
@@ -300,6 +300,19 @@ void CScene::UpdateLevel2Camera()
 		XMFLOAT3 xmf3LookAt = Vector3::Add(m_xmf3Level2PlayerPosition, XMFLOAT3(0.0f, fLookAtHeight, 0.0f));
 		pLevel2Camera->SetTimeLag(0.0f);
 		pLevel2Camera->SetPosition(xmf3CameraPosition);
+		pLevel2Camera->SetLookAt(xmf3LookAt);
+		pLevel2Camera->RegenerateViewMatrix();
+	}
+}
+void CScene::UpdateLevel2CameraLookOnly()
+{
+	if (!m_pPlayer) return;
+
+	CCamera *pLevel2Camera = m_pPlayer->GetCamera();
+	if (pLevel2Camera)
+	{
+		const float fLookAtHeight = 8.0f;
+		XMFLOAT3 xmf3LookAt = Vector3::Add(m_xmf3Level2PlayerPosition, XMFLOAT3(0.0f, fLookAtHeight, 0.0f));
 		pLevel2Camera->SetLookAt(xmf3LookAt);
 		pLevel2Camera->RegenerateViewMatrix();
 	}

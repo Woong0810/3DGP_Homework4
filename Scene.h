@@ -142,6 +142,7 @@ private:
 	void RotateLevel2PlayerTank(float fYawDelta);
 	void UpdateLevel2PlayerTankTransform(bool bSyncMainPlayerPosition);
 	void UpdateLevel2Camera();
+	void UpdateLevel2CameraLookOnly();
 	void FirePlayerProjectile();
 	void FireLevel1EnemyProjectile(int nTargetIndex);
 	void InitializeLevel1Targets();
