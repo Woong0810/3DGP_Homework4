@@ -139,6 +139,11 @@ void CScene::ResetLevel1()
 	if (pLevel1Camera)
 	{
 		XMFLOAT3 xmf3PlayerPosition = m_pPlayer->GetPosition();
+		pLevel1Camera->SetTimeLag(0.25f);
+		pLevel1Camera->SetOffset(XMFLOAT3(0.0f, 14.0f, -22.0f));
+		pLevel1Camera->GenerateProjectionMatrix(1.01f, 5000.0f, ASPECT_RATIO, 60.0f);
+		pLevel1Camera->SetViewport(0, 0, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, 0.0f, 1.0f);
+		pLevel1Camera->SetScissorRect(0, 0, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
 		pLevel1Camera->SetPosition(Vector3::Add(xmf3PlayerPosition, pLevel1Camera->GetOffset()));
 		pLevel1Camera->SetLookAt(xmf3PlayerPosition);
 		pLevel1Camera->RegenerateViewMatrix();
@@ -195,14 +200,10 @@ void CScene::ClampPlayerToTerrain()
 {
 	if (!m_pPlayer) return;
 
-	CTerrainObject *pCurrentTerrain = NULL;
+	if (m_nSceneMode != GAME_SCENE_LEVEL1) return;
+
+	CTerrainObject *pCurrentTerrain = m_pTerrain;
 	float fMinAltitude = 40.0f;
-	if (m_nSceneMode == GAME_SCENE_LEVEL1) pCurrentTerrain = m_pTerrain;
-	else if (m_nSceneMode == GAME_SCENE_LEVEL2)
-	{
-		pCurrentTerrain = m_pLevel2Terrain;
-		fMinAltitude = 8.0f;
-	}
 	if (!pCurrentTerrain) return;
 
 	XMFLOAT3 xmf3PlayerPosition = m_pPlayer->GetPosition();

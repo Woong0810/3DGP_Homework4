@@ -473,7 +473,7 @@ void CGameFramework::ProcessInput()
 			}
 		}
 	}
-	if (!m_pScene || m_pScene->IsLevelPlaying()) m_pPlayer->Update(m_GameTimer.GetTimeElapsed());
+	if (!m_pScene || (m_pScene->IsLevelPlaying() && m_pScene->ShouldUpdateMainPlayer())) m_pPlayer->Update(m_GameTimer.GetTimeElapsed());
 }
 
 void CGameFramework::AnimateObjects()
@@ -482,7 +482,7 @@ void CGameFramework::AnimateObjects()
 
 	if (m_pScene) m_pScene->AnimateObjects(fTimeElapsed);
 
-	if (!m_pScene || m_pScene->IsLevelPlaying()) m_pPlayer->Animate(fTimeElapsed, NULL);
+	if (!m_pScene || (m_pScene->IsLevelPlaying() && m_pScene->ShouldUpdateMainPlayer())) m_pPlayer->Animate(fTimeElapsed, NULL);
 }
 
 void CGameFramework::WaitForGpuComplete()
