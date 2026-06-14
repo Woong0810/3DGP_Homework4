@@ -39,6 +39,34 @@ static const int START_NAME_EXPLOSION_EFFECT_COUNT = 32;
 static const int LEVEL2_ENEMY_TANK_COUNT = 10;
 static const int LEVEL2_OBSTACLE_COUNT = 60;
 static const int LEVEL2_PROJECTILE_COUNT = 20;
+static float Clamp01(float fValue)
+{
+	return(max(0.0f, min(1.0f, fValue)));
+}
+
+static void SetObjectMaterialColors(CGameObject *pObject, const XMFLOAT4& xmf4Ambient, const XMFLOAT4& xmf4Diffuse, const XMFLOAT4& xmf4Specular, const XMFLOAT4& xmf4Emissive)
+{
+	if (!pObject) return;
+
+	for (int i = 0; i < pObject->m_nMaterials; i++)
+	{
+		if (pObject->m_ppMaterials && pObject->m_ppMaterials[i])
+		{
+			if (!pObject->m_ppMaterials[i]->m_pMaterialColors)
+			{
+				CMaterialColors *pMaterialColors = new CMaterialColors();
+				pObject->m_ppMaterials[i]->SetMaterialColors(pMaterialColors);
+			}
+			pObject->m_ppMaterials[i]->m_pMaterialColors->m_xmf4Ambient = xmf4Ambient;
+			pObject->m_ppMaterials[i]->m_pMaterialColors->m_xmf4Diffuse = xmf4Diffuse;
+			pObject->m_ppMaterials[i]->m_pMaterialColors->m_xmf4Specular = xmf4Specular;
+			pObject->m_ppMaterials[i]->m_pMaterialColors->m_xmf4Emissive = xmf4Emissive;
+		}
+	}
+	if (pObject->m_pChild) SetObjectMaterialColors(pObject->m_pChild, xmf4Ambient, xmf4Diffuse, xmf4Specular, xmf4Emissive);
+	if (pObject->m_pSibling) SetObjectMaterialColors(pObject->m_pSibling, xmf4Ambient, xmf4Diffuse, xmf4Specular, xmf4Emissive);
+}
+
 CScene::CScene()
 {
 }
@@ -51,8 +79,8 @@ void CScene::GetClearColor(float pfClearColor[4]) const
 {
 	const float pfDefaultClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 	const float pfLevel1BattleClearColor[4] = { 0.42f, 0.52f, 0.58f, 1.0f };
-	const bool bLevel1BattleScreen = ((m_nSceneMode == GAME_SCENE_LEVEL1) && !m_bLevel1Cleared && !m_bLevel1Failed);
-	const float *pfSourceClearColor = bLevel1BattleScreen ? pfLevel1BattleClearColor : pfDefaultClearColor;
+	const bool bBattleScreen = (((m_nSceneMode == GAME_SCENE_LEVEL1) && !m_bLevel1Cleared && !m_bLevel1Failed) || ((m_nSceneMode == GAME_SCENE_LEVEL2) && !m_bLevel2Cleared) || (m_nSceneMode == GAME_SCENE_LEVEL3));
+	const float *pfSourceClearColor = bBattleScreen ? pfLevel1BattleClearColor : pfDefaultClearColor;
 	for (int i = 0; i < 4; i++) pfClearColor[i] = pfSourceClearColor[i];
 }
 
@@ -912,6 +940,7 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 	pPlayerTankObject->SetChild(pPlayerTankModel, true);
 	pPlayerTankObject->OnInitialize();
 	CenterLevel2TankVisualPivot(pPlayerTankObject);
+	SetObjectMaterialColors(pPlayerTankObject, XMFLOAT4(0.03f, 0.12f, 0.13f, 1.0f), XMFLOAT4(0.00f, 0.28f, 0.30f, 1.0f), XMFLOAT4(0.12f, 0.25f, 0.25f, 16.0f), XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f));
 	m_pLevel2PlayerTank = pPlayerTankObject;
 	m_nLevel2EnemyTanks = LEVEL2_ENEMY_TANK_COUNT;
 	m_ppLevel2EnemyTanks = new CTankObject*[m_nLevel2EnemyTanks];
@@ -937,6 +966,10 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 		pTankObject->SetChild(pTankModel, true);
 		pTankObject->OnInitialize();
 		CenterLevel2TankVisualPivot(pTankObject);
+		float r = Clamp01((xmf3TankPositions[i].x + 450.0f) / 900.0f);
+		float b = Clamp01((xmf3TankPositions[i].z + 450.0f) / 900.0f);
+		float g = Clamp01(0.25f + 0.5f * (1.0f - fabsf(r - b)));
+		SetObjectMaterialColors(pTankObject, XMFLOAT4(r * 0.35f, g * 0.35f, b * 0.35f, 1.0f), XMFLOAT4(r, g, b, 1.0f), XMFLOAT4(0.18f, 0.18f, 0.18f, 16.0f), XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f));
 		pTankObject->SetScale(2.6f, 2.6f, 2.6f);
 		float fTankY = (m_pLevel2Terrain) ? m_pLevel2Terrain->GetHeight(xmf3TankPositions[i].x, xmf3TankPositions[i].z) : 0.0f;
 		pTankObject->SetPosition(XMFLOAT3(xmf3TankPositions[i].x, fTankY + 2.0f, xmf3TankPositions[i].z));
@@ -1014,7 +1047,6 @@ void CScene::RenderLevel2Objects(ID3D12GraphicsCommandList *pd3dCommandList, CCa
 	}
 	RenderLevel2Projectiles(pd3dCommandList, pCamera);
 	RenderLevel1Effects(pd3dCommandList, pCamera);
-	if (m_bLevel2Cleared) RenderLevel2YouWinText(pd3dCommandList, pCamera);
 }
 
 void CScene::ReleaseLevel2Objects()
@@ -1213,7 +1245,7 @@ void CScene::UpdateLevel2YouWinText()
 
 	float fBobY = sinf(m_fLevel2ClearElapsedTime * 2.5f) * 4.0f;
 	m_pLevel2YouWinObject->m_xmf4x4Transform = m_xmf4x4Level2YouWinBaseTransform;
-	m_pLevel2YouWinObject->SetPosition(XMFLOAT3(0.0f, 45.0f + fBobY, 120.0f));
+	m_pLevel2YouWinObject->SetPosition(XMFLOAT3(0.0f, fBobY, 0.0f));
 }
 
 void CScene::RenderLevel2YouWinText(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera)
@@ -1686,8 +1718,9 @@ void CScene::BuildObjects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *p
 	m_pLevel2YouWinObject = new CGameObject();
 	m_pLevel2YouWinObject->CreateShaderVariables(pd3dDevice, pd3dCommandList, nYouWinMeshesInHierarchy, pnYouWinMaterialsInHierarchy);
 	m_pLevel2YouWinObject->SetChild(pYouWinModel, true);
-	m_pLevel2YouWinObject->SetScale(8.0f, 8.0f, 8.0f);
-	m_pLevel2YouWinObject->SetPosition(XMFLOAT3(0.0f, 45.0f, 120.0f));
+	m_pLevel2YouWinObject->SetScale(28.0f, 28.0f, 28.0f);
+	m_pLevel2YouWinObject->Rotate(0.0f, 180.0f, 0.0f);
+	m_pLevel2YouWinObject->SetPosition(XMFLOAT3(0.0f, 0.0f, 0.0f));
 	m_xmf4x4Level2YouWinBaseTransform = m_pLevel2YouWinObject->m_xmf4x4Transform;
 	int nMeshesInHierarchy = 0;
 	int pnMaterialsInHierarchy[64]{};
@@ -1914,7 +1947,7 @@ void CScene::UpdateShaderVariables(ID3D12GraphicsCommandList *pd3dCommandList)
 {
 	::memcpy(m_pcbMappedLights->m_pLights, m_pLights, sizeof(LIGHT) * m_nLights);
 
-	if ((m_nSceneMode < GAME_SCENE_TUTORIAL) || ((m_nSceneMode == GAME_SCENE_LEVEL1) && (m_bLevel1Cleared || m_bLevel1Failed)))
+	if ((m_nSceneMode < GAME_SCENE_TUTORIAL) || ((m_nSceneMode == GAME_SCENE_LEVEL1) && (m_bLevel1Cleared || m_bLevel1Failed)) || ((m_nSceneMode == GAME_SCENE_LEVEL2) && m_bLevel2Cleared))
 	{
 		XMFLOAT4 xmf4UiAmbient = XMFLOAT4(5.0f, 5.0f, 5.0f, 1.0f);
 		int nUiLights = 0;
@@ -2189,7 +2222,7 @@ void CScene::Render(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera
 {
 	pd3dCommandList->SetGraphicsRootSignature(m_pd3dGraphicsRootSignature);
 
-	if ((m_nSceneMode < GAME_SCENE_TUTORIAL) || ((m_nSceneMode == GAME_SCENE_LEVEL1) && (m_bLevel1Cleared || m_bLevel1Failed)))
+	if ((m_nSceneMode < GAME_SCENE_TUTORIAL) || ((m_nSceneMode == GAME_SCENE_LEVEL1) && (m_bLevel1Cleared || m_bLevel1Failed)) || ((m_nSceneMode == GAME_SCENE_LEVEL2) && m_bLevel2Cleared))
 	{
 		pCamera->GenerateViewMatrix(XMFLOAT3(0.0f, 0.0f, -120.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f));
 	}
@@ -2219,6 +2252,12 @@ void CScene::Render(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera
 			m_ppGameObjects[LEVEL1_GAMEOVER_OBJECT]->UpdateTransform(NULL);
 			m_ppGameObjects[LEVEL1_GAMEOVER_OBJECT]->Render(pd3dCommandList, pCamera, m_ppGameObjects[LEVEL1_GAMEOVER_OBJECT]->m_ppd3dcbInstancingGameObjects, m_ppGameObjects[LEVEL1_GAMEOVER_OBJECT]->m_ppcbMappedInstancingGameObjects);
 		}
+		return;
+	}
+
+	if ((m_nSceneMode == GAME_SCENE_LEVEL2) && m_bLevel2Cleared)
+	{
+		RenderLevel2YouWinText(pd3dCommandList, pCamera);
 		return;
 	}
 
