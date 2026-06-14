@@ -105,6 +105,7 @@ public:
 	bool IsLevel1Failed() const { return(m_bLevel1Failed); }
 	bool ShouldRenderMainPlayer() const { return(m_nSceneMode != GAME_SCENE_LEVEL2); }
 	bool ShouldUpdateMainPlayer() const { return(m_nSceneMode != GAME_SCENE_LEVEL2); }
+	XMFLOAT3 GetDisplayPlayerPosition() const;
 	void GetClearColor(float pfClearColor[4]) const;
     void AnimateObjects(float fTimeElapsed);
     void Render(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera=NULL);
@@ -139,7 +140,7 @@ private:
 	void ClampPlayerToTerrain();
 	bool ProcessLevel2Input(UCHAR *pKeysBuffer);
 	void RotateLevel2PlayerTank(float fYawDelta);
-	void UpdateLevel2PlayerTankTransform();
+	void UpdateLevel2PlayerTankTransform(bool bSyncMainPlayerPosition);
 	void UpdateLevel2Camera();
 	void FirePlayerProjectile();
 	void FireLevel1EnemyProjectile(int nTargetIndex);

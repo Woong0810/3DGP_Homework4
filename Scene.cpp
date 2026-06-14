@@ -193,8 +193,14 @@ void CScene::ResetLevel2()
 	m_pPlayer->SetPosition(m_xmf3Level2PlayerPosition);
 	m_pPlayer->SetVelocity(XMFLOAT3(0.0f, 0.0f, 0.0f));
 
-	UpdateLevel2PlayerTankTransform();
+	UpdateLevel2PlayerTankTransform(true);
 	UpdateLevel2Camera();
+}
+XMFLOAT3 CScene::GetDisplayPlayerPosition() const
+{
+	if (m_nSceneMode == GAME_SCENE_LEVEL2) return(m_xmf3Level2PlayerPosition);
+	if (m_pPlayer) return(m_pPlayer->GetPosition());
+	return(XMFLOAT3(0.0f, 0.0f, 0.0f));
 }
 void CScene::ClampPlayerToTerrain()
 {
@@ -237,7 +243,7 @@ bool CScene::ProcessLevel2Input(UCHAR *pKeysBuffer)
 		xmf3MoveDirection = Vector3::Normalize(xmf3MoveDirection);
 		m_xmf3Level2PlayerPosition = Vector3::Add(m_xmf3Level2PlayerPosition, Vector3::ScalarProduct(xmf3MoveDirection, fMoveSpeed * m_fElapsedTime, false));
 		m_xmf3Level2PlayerPosition.y = m_pLevel2Terrain->GetHeight(m_xmf3Level2PlayerPosition.x, m_xmf3Level2PlayerPosition.z) + 3.0f;
-		UpdateLevel2PlayerTankTransform();
+		UpdateLevel2PlayerTankTransform(true);
 		UpdateLevel2Camera();
 	}
 	else
@@ -255,11 +261,11 @@ void CScene::RotateLevel2PlayerTank(float fYawDelta)
 	m_fLevel2PlayerYaw += fYawDelta;
 	if (m_fLevel2PlayerYaw > 360.0f) m_fLevel2PlayerYaw -= 360.0f;
 	if (m_fLevel2PlayerYaw < -360.0f) m_fLevel2PlayerYaw += 360.0f;
-	UpdateLevel2PlayerTankTransform();
+	UpdateLevel2PlayerTankTransform(false);
 	UpdateLevel2Camera();
 }
 
-void CScene::UpdateLevel2PlayerTankTransform()
+void CScene::UpdateLevel2PlayerTankTransform(bool bSyncMainPlayerPosition)
 {
 	if (!m_pLevel2PlayerTank || !m_pPlayer) return;
 
@@ -269,10 +275,11 @@ void CScene::UpdateLevel2PlayerTankTransform()
 	m_pLevel2PlayerTank->Rotate(0.0f, m_fLevel2PlayerYaw + fTankModelYawOffset, 0.0f);
 	m_pLevel2PlayerTank->SetPosition(m_xmf3Level2PlayerPosition);
 
-	m_pPlayer->ResetOrientation();
-	m_pPlayer->Rotate(0.0f, m_fLevel2PlayerYaw, 0.0f);
-	m_pPlayer->SetPosition(m_xmf3Level2PlayerPosition);
-	m_pPlayer->SetVelocity(XMFLOAT3(0.0f, 0.0f, 0.0f));
+	if (bSyncMainPlayerPosition)
+	{
+		m_pPlayer->SetPosition(m_xmf3Level2PlayerPosition);
+		m_pPlayer->SetVelocity(XMFLOAT3(0.0f, 0.0f, 0.0f));
+	}
 }
 
 void CScene::UpdateLevel2Camera()
@@ -920,7 +927,7 @@ void CScene::UpdateLevel2Objects(float fTimeElapsed)
 {
 	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || !m_pPlayer || !m_ppLevel2EnemyTanks) return;
 
-	XMFLOAT3 xmf3PlayerPosition = m_pPlayer->GetPosition();
+	XMFLOAT3 xmf3PlayerPosition = m_xmf3Level2PlayerPosition;
 	for (int i = 0; i < m_nLevel2EnemyTanks; i++)
 	{
 		if (m_ppLevel2EnemyTanks[i]) m_ppLevel2EnemyTanks[i]->AimTurretAt(xmf3PlayerPosition);
