@@ -264,7 +264,8 @@ void CScene::UpdateLevel2PlayerTankTransform()
 
 	m_pLevel2PlayerTank->m_xmf4x4Transform = Matrix4x4::Identity();
 	m_pLevel2PlayerTank->SetScale(2.8f, 2.8f, 2.8f);
-	m_pLevel2PlayerTank->Rotate(0.0f, m_fLevel2PlayerYaw, 0.0f);
+	const float fTankModelYawOffset = 180.0f; // M26 모델의 기본 앞 방향 보정
+	m_pLevel2PlayerTank->Rotate(0.0f, m_fLevel2PlayerYaw + fTankModelYawOffset, 0.0f);
 	m_pLevel2PlayerTank->SetPosition(m_xmf3Level2PlayerPosition);
 
 	m_pPlayer->ResetOrientation();
@@ -835,7 +836,7 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 	m_pLevel2Terrain->CreateShaderVariables(pd3dDevice, pd3dCommandList, 1, pnTerrainMaterials);
 
 	FILE *pTankFile = NULL;
-	bool bUseTankModel = (fopen_s(&pTankFile, "Unused/M26.bin", "rb") == 0);
+	bool bUseTankModel = (fopen_s(&pTankFile, "Model/M26.bin", "rb") == 0);
 	if (pTankFile) fclose(pTankFile);
 	FILE *pTreeFile = NULL;
 	bool bUseTreeModel = (fopen_s(&pTreeFile, "Model/Tree.bin", "rb") == 0);
@@ -851,7 +852,7 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 
 	int nPlayerMeshesInHierarchy = 0;
 	int pnPlayerMaterialsInHierarchy[64]{};
-	CGameObject *pPlayerTankModel = CGameObject::LoadGeometryFromFile(pd3dDevice, pd3dCommandList, m_pd3dGraphicsRootSignature, "Unused/M26.bin", &nPlayerMeshesInHierarchy, pnPlayerMaterialsInHierarchy);
+	CGameObject *pPlayerTankModel = CGameObject::LoadGeometryFromFile(pd3dDevice, pd3dCommandList, m_pd3dGraphicsRootSignature, "Model/M26.bin", &nPlayerMeshesInHierarchy, pnPlayerMaterialsInHierarchy);
 	CM26Object *pPlayerTankObject = new CM26Object();
 	pPlayerTankObject->CreateShaderVariables(pd3dDevice, pd3dCommandList, nPlayerMeshesInHierarchy, pnPlayerMaterialsInHierarchy);
 	pPlayerTankObject->SetChild(pPlayerTankModel, true);
@@ -870,7 +871,7 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 	{
 		int nMeshesInHierarchy = 0;
 		int pnMaterialsInHierarchy[64]{};
-		CGameObject *pTankModel = CGameObject::LoadGeometryFromFile(pd3dDevice, pd3dCommandList, m_pd3dGraphicsRootSignature, "Unused/M26.bin", &nMeshesInHierarchy, pnMaterialsInHierarchy);
+		CGameObject *pTankModel = CGameObject::LoadGeometryFromFile(pd3dDevice, pd3dCommandList, m_pd3dGraphicsRootSignature, "Model/M26.bin", &nMeshesInHierarchy, pnMaterialsInHierarchy);
 		CM26Object *pTankObject = new CM26Object();
 		pTankObject->CreateShaderVariables(pd3dDevice, pd3dCommandList, nMeshesInHierarchy, pnMaterialsInHierarchy);
 		pTankObject->SetChild(pTankModel, true);
