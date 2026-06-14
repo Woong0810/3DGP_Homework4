@@ -165,26 +165,31 @@ void CScene::ResetLevel1()
 
 void CScene::ResetLevel2()
 {
-	if (!m_pPlayer) return;
+	if (!m_pPlayer || !m_pLevel2PlayerTank || !m_pLevel2Terrain)
+	{
+		m_bPendingLevel2Reset = true;
+		return;
+	}
 
 	const float fStartX = 0.0f;
 	const float fStartZ = -280.0f;
-	const float fStartAltitude = 18.0f;
-	float fTerrainY = (m_pLevel2Terrain) ? m_pLevel2Terrain->GetHeight(fStartX, fStartZ) : 20.0f;
-	XMFLOAT3 xmf3StartPosition = XMFLOAT3(fStartX, fTerrainY + fStartAltitude, fStartZ);
+	const float fStartAltitude = 3.0f;
+	float fTerrainY = m_pLevel2Terrain->GetHeight(fStartX, fStartZ);
+	m_xmf3Level2PlayerPosition = XMFLOAT3(fStartX, fTerrainY + fStartAltitude, fStartZ);
+	m_fLevel2PlayerYaw = 0.0f;
+	m_bLevel2MouseDragging = false;
+	m_bPendingLevel2Reset = false;
+	m_bLevel1Cleared = false;
+	m_fLevel1ClearElapsedTime = 0.0f;
+	m_bLevel1Failed = false;
+	m_fLevel1FailedElapsedTime = 0.0f;
 
 	m_pPlayer->ResetOrientation();
-	m_pPlayer->SetPosition(xmf3StartPosition);
+	m_pPlayer->SetPosition(m_xmf3Level2PlayerPosition);
 	m_pPlayer->SetVelocity(XMFLOAT3(0.0f, 0.0f, 0.0f));
 
-	CCamera *pLevel2Camera = m_pPlayer->ChangeCamera(THIRD_PERSON_CAMERA, 0.0f);
-	if (pLevel2Camera)
-	{
-		XMFLOAT3 xmf3PlayerPosition = m_pPlayer->GetPosition();
-		pLevel2Camera->SetPosition(Vector3::Add(xmf3PlayerPosition, pLevel2Camera->GetOffset()));
-		pLevel2Camera->SetLookAt(xmf3PlayerPosition);
-		pLevel2Camera->RegenerateViewMatrix();
-	}
+	UpdateLevel2PlayerTankTransform();
+	UpdateLevel2Camera();
 }
 void CScene::ClampPlayerToTerrain()
 {
@@ -210,6 +215,82 @@ void CScene::ClampPlayerToTerrain()
 	}
 }
 
+
+bool CScene::ProcessLevel2Input(UCHAR *pKeysBuffer)
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || !m_pLevel2PlayerTank || !m_pLevel2Terrain || !m_pPlayer) return(false);
+
+	XMFLOAT3 xmf3MoveDirection = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	float fYawRadians = XMConvertToRadians(m_fLevel2PlayerYaw);
+	XMFLOAT3 xmf3Forward = XMFLOAT3(sinf(fYawRadians), 0.0f, cosf(fYawRadians));
+	XMFLOAT3 xmf3Right = XMFLOAT3(cosf(fYawRadians), 0.0f, -sinf(fYawRadians));
+
+	if ((pKeysBuffer['W'] & 0xF0) || (pKeysBuffer[VK_UP] & 0xF0)) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Forward);
+	if ((pKeysBuffer['S'] & 0xF0) || (pKeysBuffer[VK_DOWN] & 0xF0)) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Forward, -1.0f);
+	if ((pKeysBuffer['D'] & 0xF0) || (pKeysBuffer[VK_RIGHT] & 0xF0)) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Right);
+	if ((pKeysBuffer['A'] & 0xF0) || (pKeysBuffer[VK_LEFT] & 0xF0)) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Right, -1.0f);
+
+	if (Vector3::Length(xmf3MoveDirection) > 0.001f)
+	{
+		const float fMoveSpeed = 42.0f;
+		xmf3MoveDirection = Vector3::Normalize(xmf3MoveDirection);
+		m_xmf3Level2PlayerPosition = Vector3::Add(m_xmf3Level2PlayerPosition, Vector3::ScalarProduct(xmf3MoveDirection, fMoveSpeed * m_fElapsedTime, false));
+		m_xmf3Level2PlayerPosition.y = m_pLevel2Terrain->GetHeight(m_xmf3Level2PlayerPosition.x, m_xmf3Level2PlayerPosition.z) + 3.0f;
+		UpdateLevel2PlayerTankTransform();
+		UpdateLevel2Camera();
+	}
+	else
+	{
+		m_pPlayer->SetVelocity(XMFLOAT3(0.0f, 0.0f, 0.0f));
+	}
+
+	return(true);
+}
+
+void CScene::RotateLevel2PlayerTank(float fYawDelta)
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || !m_pLevel2PlayerTank || !m_pPlayer) return;
+
+	m_fLevel2PlayerYaw += fYawDelta;
+	if (m_fLevel2PlayerYaw > 360.0f) m_fLevel2PlayerYaw -= 360.0f;
+	if (m_fLevel2PlayerYaw < -360.0f) m_fLevel2PlayerYaw += 360.0f;
+	UpdateLevel2PlayerTankTransform();
+	UpdateLevel2Camera();
+}
+
+void CScene::UpdateLevel2PlayerTankTransform()
+{
+	if (!m_pLevel2PlayerTank || !m_pPlayer) return;
+
+	m_pLevel2PlayerTank->m_xmf4x4Transform = Matrix4x4::Identity();
+	m_pLevel2PlayerTank->SetScale(2.8f, 2.8f, 2.8f);
+	m_pLevel2PlayerTank->Rotate(0.0f, m_fLevel2PlayerYaw, 0.0f);
+	m_pLevel2PlayerTank->SetPosition(m_xmf3Level2PlayerPosition);
+
+	m_pPlayer->ResetOrientation();
+	m_pPlayer->Rotate(0.0f, m_fLevel2PlayerYaw, 0.0f);
+	m_pPlayer->SetPosition(m_xmf3Level2PlayerPosition);
+	m_pPlayer->SetVelocity(XMFLOAT3(0.0f, 0.0f, 0.0f));
+}
+
+void CScene::UpdateLevel2Camera()
+{
+	if (!m_pPlayer) return;
+
+	CCamera *pLevel2Camera = m_pPlayer->ChangeCamera(THIRD_PERSON_CAMERA, 0.0f);
+	if (pLevel2Camera)
+	{
+		float fYawRadians = XMConvertToRadians(m_fLevel2PlayerYaw);
+		XMFLOAT3 xmf3Forward = XMFLOAT3(sinf(fYawRadians), 0.0f, cosf(fYawRadians));
+		XMFLOAT3 xmf3CameraOffset = XMFLOAT3(-xmf3Forward.x * 34.0f, 18.0f, -xmf3Forward.z * 34.0f);
+		XMFLOAT3 xmf3CameraPosition = Vector3::Add(m_xmf3Level2PlayerPosition, xmf3CameraOffset);
+		pLevel2Camera->SetTimeLag(0.0f);
+		pLevel2Camera->SetOffset(xmf3CameraOffset);
+		pLevel2Camera->SetPosition(xmf3CameraPosition);
+		pLevel2Camera->SetLookAt(m_xmf3Level2PlayerPosition);
+		pLevel2Camera->RegenerateViewMatrix();
+	}
+}
 void CScene::FirePlayerProjectile()
 {
 	if ((m_nSceneMode != GAME_SCENE_LEVEL1) || m_bLevel1Cleared || m_bLevel1Failed || !m_pPlayer || (m_fProjectileFireCooldown > 0.0f)) return;
@@ -764,11 +845,18 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 	if (pRockFile) fclose(pRockFile);
 	if (!bUseTankModel || !bUseTreeModel || !bUseRockModel)
 	{
-		::OutputDebugStringA("[Level2] Model load skipped: Unused/M26.bin, Model/Tree.bin, or Model/Rock.bin is missing.\n");
 		ReleaseLevel2Objects();
 		return;
 	}
 
+	int nPlayerMeshesInHierarchy = 0;
+	int pnPlayerMaterialsInHierarchy[64]{};
+	CGameObject *pPlayerTankModel = CGameObject::LoadGeometryFromFile(pd3dDevice, pd3dCommandList, m_pd3dGraphicsRootSignature, "Unused/M26.bin", &nPlayerMeshesInHierarchy, pnPlayerMaterialsInHierarchy);
+	CM26Object *pPlayerTankObject = new CM26Object();
+	pPlayerTankObject->CreateShaderVariables(pd3dDevice, pd3dCommandList, nPlayerMeshesInHierarchy, pnPlayerMaterialsInHierarchy);
+	pPlayerTankObject->SetChild(pPlayerTankModel, true);
+	pPlayerTankObject->OnInitialize();
+	m_pLevel2PlayerTank = pPlayerTankObject;
 	m_nLevel2EnemyTanks = LEVEL2_ENEMY_TANK_COUNT;
 	m_ppLevel2EnemyTanks = new CTankObject*[m_nLevel2EnemyTanks];
 	for (int i = 0; i < m_nLevel2EnemyTanks; i++) m_ppLevel2EnemyTanks[i] = NULL;
@@ -842,6 +930,11 @@ void CScene::RenderLevel2Objects(ID3D12GraphicsCommandList *pd3dCommandList, CCa
 		m_pLevel2Terrain->UpdateTransform(NULL);
 		m_pLevel2Terrain->Render(pd3dCommandList, pCamera, m_pLevel2Terrain->m_ppd3dcbInstancingGameObjects, m_pLevel2Terrain->m_ppcbMappedInstancingGameObjects);
 	}
+	if (m_pLevel2PlayerTank)
+	{
+		m_pLevel2PlayerTank->UpdateTransform(NULL);
+		m_pLevel2PlayerTank->Render(pd3dCommandList, pCamera, m_pLevel2PlayerTank->m_ppd3dcbInstancingGameObjects, m_pLevel2PlayerTank->m_ppcbMappedInstancingGameObjects);
+	}
 	for (int i = 0; i < m_nLevel2Obstacles; i++)
 	{
 		if (m_ppLevel2Obstacles && m_ppLevel2Obstacles[i])
@@ -866,6 +959,11 @@ void CScene::ReleaseLevel2Objects()
 	{
 		m_pLevel2Terrain->Release();
 		m_pLevel2Terrain = NULL;
+	}
+	if (m_pLevel2PlayerTank)
+	{
+		m_pLevel2PlayerTank->Release();
+		m_pLevel2PlayerTank = NULL;
 	}
 	if (m_ppLevel2EnemyTanks)
 	{
@@ -1583,6 +1681,7 @@ void CScene::ReleaseShaderVariables()
 	for (int i = 0; i < m_nHudBars; i++) if (m_ppHudBars[i]) m_ppHudBars[i]->ReleaseShaderVariables();
 	for (int i = 0; i < m_nLevel1Decorations; i++) if (m_ppLevel1Decorations[i]) m_ppLevel1Decorations[i]->ReleaseShaderVariables();
 	if (m_pLevel2Terrain) m_pLevel2Terrain->ReleaseShaderVariables();
+	if (m_pLevel2PlayerTank) m_pLevel2PlayerTank->ReleaseShaderVariables();
 	for (int i = 0; i < m_nLevel2EnemyTanks; i++) if (m_ppLevel2EnemyTanks[i]) m_ppLevel2EnemyTanks[i]->ReleaseShaderVariables();
 	for (int i = 0; i < m_nLevel2Obstacles; i++) if (m_ppLevel2Obstacles[i]) m_ppLevel2Obstacles[i]->ReleaseShaderVariables();
 	for (int i = 0; i < m_nLevel1Effects; i++) if (m_ppLevel1Effects[i]) m_ppLevel1Effects[i]->ReleaseShaderVariables();
@@ -1597,6 +1696,7 @@ void CScene::ReleaseUploadBuffers()
 	for (int i = 0; i < m_nHudBars; i++) if (m_ppHudBars[i]) m_ppHudBars[i]->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nLevel1Decorations; i++) if (m_ppLevel1Decorations[i]) m_ppLevel1Decorations[i]->ReleaseUploadBuffers();
 	if (m_pLevel2Terrain) m_pLevel2Terrain->ReleaseUploadBuffers();
+	if (m_pLevel2PlayerTank) m_pLevel2PlayerTank->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nLevel2EnemyTanks; i++) if (m_ppLevel2EnemyTanks[i]) m_ppLevel2EnemyTanks[i]->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nLevel2Obstacles; i++) if (m_ppLevel2Obstacles[i]) m_ppLevel2Obstacles[i]->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nLevel1Effects; i++) if (m_ppLevel1Effects[i]) m_ppLevel1Effects[i]->ReleaseUploadBuffers();
@@ -1607,6 +1707,34 @@ bool CScene::OnProcessingMouseMessage(HWND hWnd, UINT nMessageID, WPARAM wParam,
 {
 	int x = LOWORD(lParam);
 	int y = HIWORD(lParam);
+	if (m_nSceneMode == GAME_SCENE_LEVEL2)
+	{
+		if (nMessageID == WM_LBUTTONDOWN)
+		{
+			m_bLevel2MouseDragging = true;
+			::SetCapture(hWnd);
+			::GetCursorPos(&m_ptLevel2OldCursorPos);
+			return(true);
+		}
+		if (nMessageID == WM_LBUTTONUP)
+		{
+			if (m_bLevel2MouseDragging)
+			{
+				m_bLevel2MouseDragging = false;
+				::ReleaseCapture();
+			}
+			return(true);
+		}
+		if ((nMessageID == WM_MOUSEMOVE) && m_bLevel2MouseDragging && (::GetCapture() == hWnd))
+		{
+			POINT ptCursorPos;
+			::GetCursorPos(&ptCursorPos);
+			float fYawDelta = (float)(ptCursorPos.x - m_ptLevel2OldCursorPos.x) * 0.28f;
+			if (fYawDelta != 0.0f) RotateLevel2PlayerTank(fYawDelta);
+			::SetCursorPos(m_ptLevel2OldCursorPos.x, m_ptLevel2OldCursorPos.y);
+			return(true);
+		}
+	}
 	if ((m_nSceneMode == GAME_SCENE_START) && (nMessageID == WM_MOUSEMOVE))
 	{
 		m_bTitleHovered = IsStartTitleHover(x, y);
@@ -1679,6 +1807,7 @@ bool CScene::OnProcessingKeyboardMessage(HWND hWnd, UINT nMessageID, WPARAM wPar
 }
 bool CScene::ProcessInput(UCHAR *pKeysBuffer)
 {
+	if (m_nSceneMode == GAME_SCENE_LEVEL2) return(ProcessLevel2Input(pKeysBuffer));
 	if ((m_nSceneMode == GAME_SCENE_LEVEL1) && !m_bLevel1Cleared && !m_bLevel1Failed && (pKeysBuffer[VK_SPACE] & 0xF0)) FirePlayerProjectile();
 	return(m_nSceneMode < GAME_SCENE_TUTORIAL);
 }
@@ -1687,6 +1816,7 @@ void CScene::AnimateObjects(float fTimeElapsed)
 {
 	m_fElapsedTime = fTimeElapsed;
 	m_fModeElapsedTime += fTimeElapsed;
+	if ((m_nSceneMode == GAME_SCENE_LEVEL2) && m_bPendingLevel2Reset && m_pPlayer) ResetLevel2();
 
 	if (m_nSceneMode == GAME_SCENE_START)
 	{

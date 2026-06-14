@@ -103,6 +103,7 @@ public:
 	bool IsLevelPlaying() const { return(m_nSceneMode >= GAME_SCENE_TUTORIAL); }
 	bool IsLevel1Cleared() const { return(m_bLevel1Cleared); }
 	bool IsLevel1Failed() const { return(m_bLevel1Failed); }
+	bool ShouldRenderMainPlayer() const { return(m_nSceneMode != GAME_SCENE_LEVEL2); }
 	void GetClearColor(float pfClearColor[4]) const;
     void AnimateObjects(float fTimeElapsed);
     void Render(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera=NULL);
@@ -135,6 +136,10 @@ private:
 	void ResetLevel1();
 	void ResetLevel2();
 	void ClampPlayerToTerrain();
+	bool ProcessLevel2Input(UCHAR *pKeysBuffer);
+	void RotateLevel2PlayerTank(float fYawDelta);
+	void UpdateLevel2PlayerTankTransform();
+	void UpdateLevel2Camera();
 	void FirePlayerProjectile();
 	void FireLevel1EnemyProjectile(int nTargetIndex);
 	void InitializeLevel1Targets();
@@ -216,10 +221,16 @@ private:
 	CEffectObject				**m_ppLevel1Effects = NULL;
 	int							m_nLevel1Effects = 0;
 	CTerrainObject				*m_pLevel2Terrain = NULL;
+	CTankObject					*m_pLevel2PlayerTank = NULL;
 	CTankObject					**m_ppLevel2EnemyTanks = NULL;
 	int							m_nLevel2EnemyTanks = 0;
 	CGameObject					**m_ppLevel2Obstacles = NULL;
 	int							m_nLevel2Obstacles = 0;
+	bool						m_bPendingLevel2Reset = false;
+	bool						m_bLevel2MouseDragging = false;
+	POINT						m_ptLevel2OldCursorPos;
+	XMFLOAT3					m_xmf3Level2PlayerPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	float						m_fLevel2PlayerYaw = 0.0f;
 	CEffectObject				**m_ppStartNameExplosionEffects = NULL;
 	int							m_nStartNameExplosionEffects = 0;
 	int							m_nPlayerMaxHP = 100;
