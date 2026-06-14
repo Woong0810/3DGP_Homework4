@@ -438,11 +438,20 @@ void CGameFramework::ProcessInput()
 	if (!bProcessedByScene)
 	{
 		XMFLOAT3 xmf3MoveDirection = XMFLOAT3(0.0f, 0.0f, 0.0f);
+		XMFLOAT3 xmf3Look = m_pPlayer->GetLookVector();
+		XMFLOAT3 xmf3Right = m_pPlayer->GetRightVector();
+		CCamera *pCamera = m_pPlayer->GetCamera();
+		if (pCamera && (pCamera->GetMode() == FIRST_PERSON_CAMERA))
+		{
+			xmf3Right.y = 0.0f;
+			if (Vector3::Length(xmf3Right) > 0.001f) xmf3Right = Vector3::Normalize(xmf3Right);
+		}
+
 		bool bMoveInput = false;
-		if (pKeysBuffer['W'] & 0xF0) { xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, m_pPlayer->GetLookVector()); bMoveInput = true; }
-		if (pKeysBuffer['S'] & 0xF0) { xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, m_pPlayer->GetLookVector(), -1.0f); bMoveInput = true; }
-		if (pKeysBuffer['A'] & 0xF0) { xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, m_pPlayer->GetRightVector(), -1.0f); bMoveInput = true; }
-		if (pKeysBuffer['D'] & 0xF0) { xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, m_pPlayer->GetRightVector()); bMoveInput = true; }
+		if (pKeysBuffer['W'] & 0xF0) { xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Look); bMoveInput = true; }
+		if (pKeysBuffer['S'] & 0xF0) { xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Look, -1.0f); bMoveInput = true; }
+		if (pKeysBuffer['A'] & 0xF0) { xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Right, -1.0f); bMoveInput = true; }
+		if (pKeysBuffer['D'] & 0xF0) { xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Right); bMoveInput = true; }
 
 		float cxDelta = 0.0f, cyDelta = 0.0f;
 		POINT ptCursorPos;
