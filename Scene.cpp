@@ -283,10 +283,11 @@ void CScene::UpdateLevel2Camera()
 	{
 		float fYawRadians = XMConvertToRadians(m_fLevel2PlayerYaw);
 		XMFLOAT3 xmf3Forward = XMFLOAT3(sinf(fYawRadians), 0.0f, cosf(fYawRadians));
-		XMFLOAT3 xmf3CameraOffset = XMFLOAT3(-xmf3Forward.x * 34.0f, 18.0f, -xmf3Forward.z * 34.0f);
-		XMFLOAT3 xmf3CameraPosition = Vector3::Add(m_xmf3Level2PlayerPosition, xmf3CameraOffset);
+		XMFLOAT3 xmf3CameraLocalOffset = XMFLOAT3(0.0f, 18.0f, -34.0f);
+		XMFLOAT3 xmf3CameraWorldOffset = XMFLOAT3(-xmf3Forward.x * 34.0f, 18.0f, -xmf3Forward.z * 34.0f);
+		XMFLOAT3 xmf3CameraPosition = Vector3::Add(m_xmf3Level2PlayerPosition, xmf3CameraWorldOffset);
 		pLevel2Camera->SetTimeLag(0.0f);
-		pLevel2Camera->SetOffset(xmf3CameraOffset);
+		pLevel2Camera->SetOffset(xmf3CameraLocalOffset);
 		pLevel2Camera->SetPosition(xmf3CameraPosition);
 		pLevel2Camera->SetLookAt(m_xmf3Level2PlayerPosition);
 		pLevel2Camera->RegenerateViewMatrix();
