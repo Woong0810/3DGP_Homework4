@@ -282,18 +282,15 @@ void CScene::UpdateLevel2Camera()
 	CCamera *pLevel2Camera = m_pPlayer->ChangeCamera(THIRD_PERSON_CAMERA, 0.0f);
 	if (pLevel2Camera)
 	{
-		const float fCameraDistance = 80.0f;
-		const float fCameraHeight = 30.0f;
 		float fYawRadians = XMConvertToRadians(m_fLevel2PlayerYaw);
 		XMFLOAT3 xmf3Forward = XMFLOAT3(sinf(fYawRadians), 0.0f, cosf(fYawRadians));
-		XMFLOAT3 xmf3CameraLocalOffset = XMFLOAT3(0.0f, fCameraHeight, -fCameraDistance);
-		XMFLOAT3 xmf3CameraWorldOffset = XMFLOAT3(-xmf3Forward.x * fCameraDistance, fCameraHeight, -xmf3Forward.z * fCameraDistance);
+		XMFLOAT3 xmf3CameraLocalOffset = XMFLOAT3(0.0f, 30.0f, -80.0f);
+		XMFLOAT3 xmf3CameraWorldOffset = XMFLOAT3(-xmf3Forward.x * 34.0f, 18.0f, -xmf3Forward.z * 34.0f);
 		XMFLOAT3 xmf3CameraPosition = Vector3::Add(m_xmf3Level2PlayerPosition, xmf3CameraWorldOffset);
-		XMFLOAT3 xmf3LookAtPosition = Vector3::Add(m_xmf3Level2PlayerPosition, XMFLOAT3(0.0f, 6.0f, 0.0f));
 		pLevel2Camera->SetTimeLag(0.0f);
 		pLevel2Camera->SetOffset(xmf3CameraLocalOffset);
 		pLevel2Camera->SetPosition(xmf3CameraPosition);
-		pLevel2Camera->SetLookAt(xmf3LookAtPosition);
+		pLevel2Camera->SetLookAt(m_xmf3Level2PlayerPosition);
 		pLevel2Camera->RegenerateViewMatrix();
 	}
 }
