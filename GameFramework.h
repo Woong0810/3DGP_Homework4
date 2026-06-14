@@ -47,6 +47,8 @@ private:
 
 	int							m_nWndClientWidth;
 	int							m_nWndClientHeight;
+	RECT						m_rcWindowedRect = {};
+	bool						m_bWindowedRectSaved = false;
         
 	IDXGIFactory4				*m_pdxgiFactory = NULL;
 	IDXGISwapChain3				*m_pdxgiSwapChain = NULL;

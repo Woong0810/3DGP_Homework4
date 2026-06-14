@@ -2717,10 +2717,27 @@ void CScene::ReleaseUploadBuffers()
 	for (int i = 0; i < m_nStartNameExplosionEffects; i++) if (m_ppStartNameExplosionEffects[i]) m_ppStartNameExplosionEffects[i]->ReleaseUploadBuffers();
 }
 
+POINT CScene::GetLogicalMousePoint(HWND hWnd, int x, int y) const
+{
+	POINT ptLogical = { x, y };
+	RECT rcClient;
+	::GetClientRect(hWnd, &rcClient);
+	float fClientWidth = (float)(rcClient.right - rcClient.left);
+	float fClientHeight = (float)(rcClient.bottom - rcClient.top);
+	if ((fClientWidth > 1.0f) && (fClientHeight > 1.0f))
+	{
+		ptLogical.x = (int)((float)x * (float)FRAME_BUFFER_WIDTH / fClientWidth);
+		ptLogical.y = (int)((float)y * (float)FRAME_BUFFER_HEIGHT / fClientHeight);
+	}
+	return(ptLogical);
+}
 bool CScene::OnProcessingMouseMessage(HWND hWnd, UINT nMessageID, WPARAM wParam, LPARAM lParam)
 {
 	int x = LOWORD(lParam);
 	int y = HIWORD(lParam);
+	POINT ptLogical = GetLogicalMousePoint(hWnd, x, y);
+	int nLogicalX = ptLogical.x;
+	int nLogicalY = ptLogical.y;
 	if (m_nSceneMode == GAME_SCENE_LEVEL2)
 	{
 		if (nMessageID == WM_RBUTTONDOWN)
@@ -2757,20 +2774,20 @@ bool CScene::OnProcessingMouseMessage(HWND hWnd, UINT nMessageID, WPARAM wParam,
 	}
 	if ((m_nSceneMode == GAME_SCENE_START) && (nMessageID == WM_MOUSEMOVE))
 	{
-		m_bTitleHovered = IsStartTitleHover(x, y);
-		m_bNameHovered = IsStartNameHover(x, y);
+		m_bTitleHovered = IsStartTitleHover(nLogicalX, nLogicalY);
+		m_bNameHovered = IsStartNameHover(nLogicalX, nLogicalY);
 		return(true);
 	}
 	if ((m_nSceneMode == GAME_SCENE_MENU) && (nMessageID == WM_MOUSEMOVE))
 	{
 		int nHoveredMenuItem = -1;
-		IsMenuStartHover(x, y, &nHoveredMenuItem);
+		IsMenuStartHover(nLogicalX, nLogicalY, &nHoveredMenuItem);
 		for (int i = 0; i < UI_MENU_START_COUNT; i++) m_bMenuStartHovered[i] = (i == nHoveredMenuItem);
-		m_bMenuEndHovered = IsMenuEndHover(x, y);
+		m_bMenuEndHovered = IsMenuEndHover(nLogicalX, nLogicalY);
 		return(true);
 	}
 	if (nMessageID != WM_LBUTTONUP) return(false);
-	if ((m_nSceneMode == GAME_SCENE_START) && !m_bNameExploding && IsStartNameHover(x, y))
+	if ((m_nSceneMode == GAME_SCENE_START) && !m_bNameExploding && IsStartNameHover(nLogicalX, nLogicalY))
 	{
 		m_bNameExploding = true;
 		m_fNameExplosionElapsedTime = 0.0f;
@@ -2780,7 +2797,7 @@ bool CScene::OnProcessingMouseMessage(HWND hWnd, UINT nMessageID, WPARAM wParam,
 	if (m_nSceneMode == GAME_SCENE_MENU)
 	{
 		int nSelectedMenuItem = -1;
-		if (IsMenuStartHover(x, y, &nSelectedMenuItem))
+		if (IsMenuStartHover(nLogicalX, nLogicalY, &nSelectedMenuItem))
 		{
 			static const GAME_SCENE_MODE pnMenuSceneModes[UI_MENU_START_COUNT] =
 			{
@@ -2792,7 +2809,7 @@ bool CScene::OnProcessingMouseMessage(HWND hWnd, UINT nMessageID, WPARAM wParam,
 			SetSceneMode(pnMenuSceneModes[nSelectedMenuItem]);
 			return(true);
 		}
-		if (IsMenuEndHover(x, y))
+		if (IsMenuEndHover(nLogicalX, nLogicalY))
 		{
 			::PostQuitMessage(0);
 			return(true);

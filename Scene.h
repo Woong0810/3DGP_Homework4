@@ -232,6 +232,7 @@ private:
 	bool IsStartNameHover(int x, int y) const;
 	bool IsMenuStartHover(int x, int y, int *pnMenuItem = NULL) const;
 	bool IsMenuEndHover(int x, int y) const;
+	POINT GetLogicalMousePoint(HWND hWnd, int x, int y) const;
 
 	GAME_SCENE_MODE			m_nSceneMode = GAME_SCENE_START;
 	bool						m_bTitleHovered = false;

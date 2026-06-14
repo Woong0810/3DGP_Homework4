@@ -257,7 +257,20 @@ void CGameFramework::ChangeSwapChainState()
 
 	BOOL bFullScreenState = FALSE;
 	m_pdxgiSwapChain->GetFullscreenState(&bFullScreenState, NULL);
-	m_pdxgiSwapChain->SetFullscreenState(!bFullScreenState, NULL);
+	if (!bFullScreenState)
+	{
+		::GetWindowRect(m_hWnd, &m_rcWindowedRect);
+		m_bWindowedRectSaved = true;
+		m_pdxgiSwapChain->SetFullscreenState(TRUE, NULL);
+	}
+	else
+	{
+		m_pdxgiSwapChain->SetFullscreenState(FALSE, NULL);
+		if (m_bWindowedRectSaved)
+		{
+			::SetWindowPos(m_hWnd, HWND_NOTOPMOST, m_rcWindowedRect.left, m_rcWindowedRect.top, m_rcWindowedRect.right - m_rcWindowedRect.left, m_rcWindowedRect.bottom - m_rcWindowedRect.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+		}
+	}
 
 	DXGI_MODE_DESC dxgiTargetParameters;
 	dxgiTargetParameters.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -303,6 +316,12 @@ void CGameFramework::OnProcessingMouseMessage(HWND hWnd, UINT nMessageID, WPARAM
 
 void CGameFramework::OnProcessingKeyboardMessage(HWND hWnd, UINT nMessageID, WPARAM wParam, LPARAM lParam)
 {
+	if ((nMessageID == WM_KEYUP) && (wParam == VK_F9))
+	{
+		ChangeSwapChainState();
+		return;
+	}
+
 	if (m_pScene && m_pScene->OnProcessingKeyboardMessage(hWnd, nMessageID, wParam, lParam)) return;
 	switch (nMessageID)
 	{
@@ -325,9 +344,6 @@ void CGameFramework::OnProcessingKeyboardMessage(HWND hWnd, UINT nMessageID, WPA
 					{
 						m_pCamera = m_pPlayer->ChangeCamera(THIRD_PERSON_CAMERA, m_GameTimer.GetTimeElapsed());
 					}
-					break;
-				case VK_F9:
-					ChangeSwapChainState();
 					break;
 				case VK_F5:
 					break;
