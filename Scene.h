@@ -163,6 +163,14 @@ private:
 	void UpdateLevel2Objects(float fTimeElapsed);
 	void RenderLevel2Objects(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
 	void ReleaseLevel2Objects();
+	void BuildLevel2Projectiles(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList);
+	void ResetLevel2Projectiles();
+	void UpdateLevel2Projectiles(float fTimeElapsed);
+	void RenderLevel2Projectiles(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
+	void ReleaseLevel2Projectiles();
+	void FireLevel2PlayerProjectile();
+	void CheckLevel2ProjectileEnemyCollisions();
+	void DestroyLevel2EnemyTank(int nEnemyIndex);
 	void BuildLevel1Effects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList);
 	void ResetLevel1Effects();
 	void UpdateLevel1Effects(float fTimeElapsed);
@@ -228,8 +236,12 @@ private:
 	CTankObject					*m_pLevel2PlayerTank = NULL;
 	CTankObject					**m_ppLevel2EnemyTanks = NULL;
 	int							m_nLevel2EnemyTanks = 0;
+	bool						*m_pbLevel2EnemyTankAlive = NULL;
 	CGameObject					**m_ppLevel2Obstacles = NULL;
 	int							m_nLevel2Obstacles = 0;
+	CProjectileObject			**m_ppLevel2Projectiles = NULL;
+	int							m_nLevel2Projectiles = 0;
+	float						m_fLevel2ProjectileFireCooldown = 0.0f;
 	bool						m_bPendingLevel2Reset = false;
 	bool						m_bLevel2MouseDragging = false;
 	POINT						m_ptLevel2OldCursorPos;
