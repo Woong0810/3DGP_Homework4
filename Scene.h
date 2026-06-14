@@ -185,6 +185,7 @@ private:
 	bool IsLevel2Cleared() const;
 	void UpdateLevel2ClearState();
 	void UpdateLevel2YouWinText();
+	void UpdateLevel2GameOverText();
 	void RenderLevel2YouWinText(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
 	void PickLevel2EnemyTank(int xClient, int yClient);
 	void UpdateLevel2TankColors();
@@ -198,6 +199,9 @@ private:
 	void CheckLevel3EnemyProjectilePlayerCollisions();
 	bool IsLevel3Cleared() const;
 	void UpdateLevel3ClearState();
+	void DestroyAllLevel3EnemyTanks();
+	void UpdateLevel3ClearText();
+	void UpdateLevel3GameOverText();
 	void BuildLevel1Effects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList);
 	void ResetLevel1Effects();
 	void UpdateLevel1Effects(float fTimeElapsed);
@@ -279,6 +283,7 @@ private:
 	bool						m_bLevel2AutoAttackKeyDown = false;
 	bool						m_bLevel2ShieldKeyDown = false;
 	bool						m_bLevel2Failed = false;
+	float						m_fLevel2FailedElapsedTime = 0.0f;
 	int							m_nLevel2PlayerMaxHP = 100;
 	int							m_nLevel2PlayerHP = 100;
 	bool						m_bLevel2Cleared = false;

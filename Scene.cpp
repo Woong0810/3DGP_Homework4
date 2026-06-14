@@ -236,6 +236,7 @@ void CScene::ResetLevel2()
 	m_bLevel2Cleared = false;
 	m_fLevel2ClearElapsedTime = 0.0f;
 	m_bLevel2Failed = false;
+	m_fLevel2FailedElapsedTime = 0.0f;
 	m_nLevel2SelectedEnemyTankIndex = -1;
 	m_bLevel2AutoAttack = false;
 	m_bLevel2Shield = false;
@@ -1545,6 +1546,45 @@ void CScene::UpdateLevel3ClearState()
 	}
 }
 
+void CScene::DestroyAllLevel3EnemyTanks()
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL3) || m_bLevel3Cleared || m_bLevel3Failed) return;
+	if (!m_ppLevel3EnemyTanks || !m_pbLevel3EnemyTankAlive) return;
+
+	for (int i = 0; i < m_nLevel3EnemyTanks; i++)
+	{
+		if (m_ppLevel3EnemyTanks[i] && m_pbLevel3EnemyTankAlive[i])
+		{
+			m_pbLevel3EnemyTankAlive[i] = false;
+			SpawnLevel1ExplosionEffect(m_ppLevel3EnemyTanks[i]->GetPosition());
+		}
+	}
+
+	UpdateLevel3ClearState();
+}
+
+void CScene::UpdateLevel3ClearText()
+{
+	if (!m_bLevel3Cleared) return;
+	if (!m_ppGameObjects || !m_ppGameObjects[LEVEL1_CLEAR_OBJECT]) return;
+
+	float fClearY = sinf(m_fLevel3ClearElapsedTime * 2.5f) * 4.0f;
+	CGameObject *pClearObject = m_ppGameObjects[LEVEL1_CLEAR_OBJECT];
+	pClearObject->m_xmf4x4Transform = m_xmf4x4Level1ClearBaseTransform;
+	pClearObject->SetPosition(XMFLOAT3(0.0f, fClearY, 0.0f));
+}
+
+void CScene::UpdateLevel3GameOverText()
+{
+	if (!m_bLevel3Failed) return;
+	if (!m_ppGameObjects || !m_ppGameObjects[LEVEL1_GAMEOVER_OBJECT]) return;
+
+	const float fGameOverBaseX = 80.0f;
+	float fGameOverY = sinf(m_fLevel3FailedElapsedTime * 2.5f) * 4.0f;
+	CGameObject *pGameOverObject = m_ppGameObjects[LEVEL1_GAMEOVER_OBJECT];
+	pGameOverObject->m_xmf4x4Transform = m_xmf4x4Level1GameOverBaseTransform;
+	pGameOverObject->SetPosition(XMFLOAT3(fGameOverBaseX, fGameOverY, 0.0f));
+}
 void CScene::BuildLevel2Projectiles(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList)
 {
 	ReleaseLevel2Projectiles();
@@ -1791,6 +1831,7 @@ void CScene::ApplyDamageToLevel2Player(int nDamage)
 	{
 		m_bLevel2Failed = true;
 		m_bLevel2Cleared = false;
+		m_fLevel2FailedElapsedTime = 0.0f;
 		m_bLevel2AutoAttack = false;
 		m_bLevel2Shield = false;
 		m_nLevel2SelectedEnemyTankIndex = -1;
@@ -1889,6 +1930,17 @@ void CScene::UpdateLevel2YouWinText()
 	m_pLevel2YouWinObject->SetPosition(XMFLOAT3(0.0f, fBobY, 0.0f));
 }
 
+void CScene::UpdateLevel2GameOverText()
+{
+	if (!m_bLevel2Failed) return;
+	if (!m_ppGameObjects || !m_ppGameObjects[LEVEL1_GAMEOVER_OBJECT]) return;
+
+	const float fGameOverBaseX = 80.0f;
+	float fGameOverY = sinf(m_fLevel2FailedElapsedTime * 2.5f) * 4.0f;
+	CGameObject *pGameOverObject = m_ppGameObjects[LEVEL1_GAMEOVER_OBJECT];
+	pGameOverObject->m_xmf4x4Transform = m_xmf4x4Level1GameOverBaseTransform;
+	pGameOverObject->SetPosition(XMFLOAT3(fGameOverBaseX, fGameOverY, 0.0f));
+}
 void CScene::RenderLevel2YouWinText(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera)
 {
 	if (!m_bLevel2Cleared || !m_pLevel2YouWinObject) return;
@@ -2197,6 +2249,7 @@ void CScene::UpdateLevel1HudBars()
 	if (!m_ppHudBars || (m_nHudBars < HUD_BAR_COUNT)) return;
 	if (!m_ppHudBars[HUD_PLAYER_BACKGROUND] || !m_ppHudBars[HUD_PLAYER_GAUGE] || !m_ppHudBars[HUD_ENEMY_BACKGROUND] || !m_ppHudBars[HUD_ENEMY_GAUGE]) return;
 	if ((m_nSceneMode == GAME_SCENE_LEVEL1) && m_bLevel1Cleared) return;
+	if ((m_nSceneMode == GAME_SCENE_LEVEL2) && (m_bLevel2Cleared || m_bLevel2Failed)) return;
 	if ((m_nSceneMode == GAME_SCENE_LEVEL3) && (m_bLevel3Cleared || m_bLevel3Failed)) return;
 	if ((m_nSceneMode != GAME_SCENE_LEVEL1) && (m_nSceneMode != GAME_SCENE_LEVEL2) && (m_nSceneMode != GAME_SCENE_LEVEL3)) return;
 
@@ -2249,7 +2302,7 @@ void CScene::UpdateLevel1HudBars()
 }
 void CScene::RenderLevel1HudBars(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera)
 {
-	if (((m_nSceneMode != GAME_SCENE_LEVEL1) && (m_nSceneMode != GAME_SCENE_LEVEL2) && (m_nSceneMode != GAME_SCENE_LEVEL3)) || ((m_nSceneMode == GAME_SCENE_LEVEL1) && m_bLevel1Cleared) || ((m_nSceneMode == GAME_SCENE_LEVEL2) && m_bLevel2Cleared) || ((m_nSceneMode == GAME_SCENE_LEVEL3) && (m_bLevel3Cleared || m_bLevel3Failed)) || !m_ppHudBars) return;
+	if (((m_nSceneMode != GAME_SCENE_LEVEL1) && (m_nSceneMode != GAME_SCENE_LEVEL2) && (m_nSceneMode != GAME_SCENE_LEVEL3)) || ((m_nSceneMode == GAME_SCENE_LEVEL1) && m_bLevel1Cleared) || ((m_nSceneMode == GAME_SCENE_LEVEL2) && (m_bLevel2Cleared || m_bLevel2Failed)) || ((m_nSceneMode == GAME_SCENE_LEVEL3) && (m_bLevel3Cleared || m_bLevel3Failed)) || !m_ppHudBars) return;
 	for (int i = 0; i < m_nHudBars; i++)
 	{
 		if (((m_nSceneMode == GAME_SCENE_LEVEL2) || (m_nSceneMode == GAME_SCENE_LEVEL3)) && ((i == HUD_ENEMY_BACKGROUND) || (i == HUD_ENEMY_GAUGE))) continue;
@@ -2263,7 +2316,7 @@ void CScene::RenderLevel1HudBars(ID3D12GraphicsCommandList *pd3dCommandList, CCa
 
 void CScene::RenderLevel1HudOverlay(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera)
 {
-	if (((m_nSceneMode != GAME_SCENE_LEVEL1) && (m_nSceneMode != GAME_SCENE_LEVEL2) && (m_nSceneMode != GAME_SCENE_LEVEL3)) || ((m_nSceneMode == GAME_SCENE_LEVEL1) && (m_bLevel1Cleared || m_bLevel1Failed)) || ((m_nSceneMode == GAME_SCENE_LEVEL2) && m_bLevel2Cleared) || ((m_nSceneMode == GAME_SCENE_LEVEL3) && (m_bLevel3Cleared || m_bLevel3Failed)) || !pd3dCommandList || !pCamera || !m_ppHudBars || !m_pHudCamera) return;
+	if (((m_nSceneMode != GAME_SCENE_LEVEL1) && (m_nSceneMode != GAME_SCENE_LEVEL2) && (m_nSceneMode != GAME_SCENE_LEVEL3)) || ((m_nSceneMode == GAME_SCENE_LEVEL1) && (m_bLevel1Cleared || m_bLevel1Failed)) || ((m_nSceneMode == GAME_SCENE_LEVEL2) && (m_bLevel2Cleared || m_bLevel2Failed)) || ((m_nSceneMode == GAME_SCENE_LEVEL3) && (m_bLevel3Cleared || m_bLevel3Failed)) || !pd3dCommandList || !pCamera || !m_ppHudBars || !m_pHudCamera) return;
 
 	UpdateLevel1HudBars();
 
@@ -2788,6 +2841,7 @@ bool CScene::OnProcessingKeyboardMessage(HWND hWnd, UINT nMessageID, WPARAM wPar
 bool CScene::ProcessInput(UCHAR *pKeysBuffer)
 {
 	if (m_nSceneMode == GAME_SCENE_LEVEL2) return(ProcessLevel2Input(pKeysBuffer));
+	if ((m_nSceneMode == GAME_SCENE_LEVEL3) && !m_bLevel3Cleared && !m_bLevel3Failed && (pKeysBuffer['K'] & 0xF0)) DestroyAllLevel3EnemyTanks();
 	if (((m_nSceneMode == GAME_SCENE_LEVEL1) && !m_bLevel1Cleared && !m_bLevel1Failed && (pKeysBuffer[VK_SPACE] & 0xF0)) || ((m_nSceneMode == GAME_SCENE_LEVEL3) && !m_bLevel3Cleared && !m_bLevel3Failed && (pKeysBuffer[VK_SPACE] & 0xF0))) FirePlayerProjectile();
 	return(m_nSceneMode < GAME_SCENE_TUTORIAL);
 }
@@ -2874,6 +2928,11 @@ void CScene::AnimateObjects(float fTimeElapsed)
 			UpdateLevel2YouWinText();
 			if (m_fLevel2ClearElapsedTime >= 2.0f) SetSceneMode(GAME_SCENE_LEVEL3);
 		}
+		else if (m_bLevel2Failed)
+		{
+			m_fLevel2FailedElapsedTime += fTimeElapsed;
+			UpdateLevel2GameOverText();
+		}
 	}
 
 	if (m_nSceneMode == GAME_SCENE_LEVEL3)
@@ -2882,11 +2941,13 @@ void CScene::AnimateObjects(float fTimeElapsed)
 		if (m_bLevel3Cleared)
 		{
 			m_fLevel3ClearElapsedTime += fTimeElapsed;
+			UpdateLevel3ClearText();
 		}
 		else if (m_bLevel3Failed)
 		{
 			m_fLevel3FailedElapsedTime += fTimeElapsed;
 			ResetLevel1Effects();
+			UpdateLevel3GameOverText();
 		}
 		else
 		{
