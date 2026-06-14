@@ -289,7 +289,7 @@ void CScene::UpdateLevel2Camera()
 		const float fLookAtHeight = 8.0f;
 		float fVisualYawRadians = XMConvertToRadians(m_fLevel2PlayerYaw + fTankModelYawOffset);
 		XMFLOAT3 xmf3TankVisualForward = XMFLOAT3(sinf(fVisualYawRadians), 0.0f, cosf(fVisualYawRadians));
-		XMFLOAT3 xmf3CameraWorldOffset = XMFLOAT3(-xmf3TankVisualForward.x * fCameraDistance, fCameraHeight, -xmf3TankVisualForward.z * fCameraDistance);
+		XMFLOAT3 xmf3CameraWorldOffset = XMFLOAT3(xmf3TankVisualForward.x * fCameraDistance, fCameraHeight, xmf3TankVisualForward.z * fCameraDistance);
 		XMFLOAT3 xmf3CameraPosition = Vector3::Add(m_xmf3Level2PlayerPosition, xmf3CameraWorldOffset);
 		XMFLOAT3 xmf3LookAt = Vector3::Add(m_xmf3Level2PlayerPosition, XMFLOAT3(0.0f, fLookAtHeight, 0.0f));
 		pLevel2Camera->SetTimeLag(0.0f);
