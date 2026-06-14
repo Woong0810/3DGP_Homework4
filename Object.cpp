@@ -825,7 +825,9 @@ void CTankObject::AimTurretAt(const XMFLOAT3& xmf3TargetPosition)
 	float fDeltaZ = xmf3TargetPosition.z - xmf3TankPosition.z;
 	if ((fabsf(fDeltaX) < 0.001f) && (fabsf(fDeltaZ) < 0.001f)) return;
 
-	float fYaw = atan2f(fDeltaX, fDeltaZ);
+	const float fTurretYawOffset = 165.0f;
+	float fYaw = atan2f(fDeltaX, fDeltaZ) + XMConvertToRadians(fTurretYawOffset);
+
 	XMMATRIX xmmtxRotate = XMMatrixRotationY(fYaw);
 	m_pTurretFrame->m_xmf4x4Transform = Matrix4x4::Multiply(xmmtxRotate, m_xmf4x4TurretBaseTransform);
 	m_pTurretFrame->UpdateTransform(&m_xmf4x4World);

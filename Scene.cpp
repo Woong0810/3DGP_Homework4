@@ -921,7 +921,6 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 		pTankObject->OnInitialize();
 		CenterLevel2TankVisualPivot(pTankObject);
 		pTankObject->SetScale(2.6f, 2.6f, 2.6f);
-		pTankObject->Rotate(0.0f, (float)(i * 31), 0.0f);
 		float fTankY = (m_pLevel2Terrain) ? m_pLevel2Terrain->GetHeight(xmf3TankPositions[i].x, xmf3TankPositions[i].z) : 0.0f;
 		pTankObject->SetPosition(XMFLOAT3(xmf3TankPositions[i].x, fTankY + 2.0f, xmf3TankPositions[i].z));
 		m_ppLevel2EnemyTanks[i] = pTankObject;
