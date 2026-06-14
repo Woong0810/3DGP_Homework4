@@ -171,6 +171,11 @@ private:
 	void FireLevel2PlayerProjectile();
 	void CheckLevel2ProjectileEnemyCollisions();
 	void DestroyLevel2EnemyTank(int nEnemyIndex);
+	void DestroyAllLevel2EnemyTanks();
+	bool IsLevel2Cleared() const;
+	void UpdateLevel2ClearState();
+	void UpdateLevel2YouWinText();
+	void RenderLevel2YouWinText(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
 	void BuildLevel1Effects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList);
 	void ResetLevel1Effects();
 	void UpdateLevel1Effects(float fTimeElapsed);
@@ -242,6 +247,10 @@ private:
 	CProjectileObject			**m_ppLevel2Projectiles = NULL;
 	int							m_nLevel2Projectiles = 0;
 	float						m_fLevel2ProjectileFireCooldown = 0.0f;
+	bool						m_bLevel2Cleared = false;
+	float						m_fLevel2ClearElapsedTime = 0.0f;
+	CGameObject					*m_pLevel2YouWinObject = NULL;
+	XMFLOAT4X4					m_xmf4x4Level2YouWinBaseTransform;
 	bool						m_bPendingLevel2Reset = false;
 	bool						m_bLevel2MouseDragging = false;
 	POINT						m_ptLevel2OldCursorPos;
