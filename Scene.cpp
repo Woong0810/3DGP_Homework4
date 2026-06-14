@@ -45,6 +45,19 @@ static float Clamp01(float fValue)
 	return(max(0.0f, min(1.0f, fValue)));
 }
 
+static float GetLevel2ObstacleScale(int nObstacleIndex)
+{
+	bool bTree = ((nObstacleIndex % 3) != 0);
+	return(bTree ? (2.50f + (float)(nObstacleIndex % 5) * 0.25f) : (2.50f + (float)(nObstacleIndex % 4) * 0.30f));
+}
+
+static float GetLevel2ObstacleRadius(int nObstacleIndex)
+{
+	bool bTree = ((nObstacleIndex % 3) != 0);
+	float fScale = GetLevel2ObstacleScale(nObstacleIndex);
+	return(bTree ? (4.0f * fScale) : (4.8f * fScale));
+}
+
 static void SetObjectMaterialColors(CGameObject *pObject, const XMFLOAT4& xmf4Ambient, const XMFLOAT4& xmf4Diffuse, const XMFLOAT4& xmf4Specular, const XMFLOAT4& xmf4Emissive)
 {
 	if (!pObject) return;
@@ -1029,7 +1042,7 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 		float x = -430.0f + fColumn * 95.0f + (float)((i * 17) % 31 - 15);
 		float z = -470.0f + fRow * 190.0f + (float)((i * 23) % 47 - 23);
 		float y = (m_pLevel2Terrain) ? m_pLevel2Terrain->GetHeight(x, z) : 0.0f;
-		float fScale = bTree ? (2.60f + (float)(i % 5) * 0.18f) : (2.40f + (float)(i % 4) * 0.22f);
+		float fScale = GetLevel2ObstacleScale(i);
 		float fYaw = fmodf((float)(i * 43), 360.0f);
 
 		int nMeshesInHierarchy = 0;
@@ -1049,13 +1062,12 @@ bool CScene::IsLevel2PlayerCollidingWithObstacle()
 {
 	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || !m_ppLevel2Obstacles) return(false);
 
-	const float fPlayerRadius = 12.0f;
+	const float fPlayerRadius = 10.0f;
 	for (int i = 0; i < m_nLevel2Obstacles; i++)
 	{
 		if (!m_ppLevel2Obstacles[i]) continue;
 
-		bool bTree = ((i % 3) != 0);
-		float fObstacleRadius = bTree ? (15.0f + (float)(i % 5) * 1.5f) : (18.0f + (float)(i % 4) * 2.0f);
+		float fObstacleRadius = GetLevel2ObstacleRadius(i);
 		XMFLOAT3 xmf3ObstaclePosition = m_ppLevel2Obstacles[i]->GetPosition();
 		float dx = m_xmf3Level2PlayerPosition.x - xmf3ObstaclePosition.x;
 		float dz = m_xmf3Level2PlayerPosition.z - xmf3ObstaclePosition.z;
@@ -1085,8 +1097,7 @@ void CScene::CheckLevel2ProjectileObstacleCollisions()
 			{
 				if (!m_ppLevel2Obstacles[j]) continue;
 
-				bool bTree = ((j % 3) != 0);
-				float fObstacleRadius = bTree ? (15.0f + (float)(j % 5) * 1.5f) : (18.0f + (float)(j % 4) * 2.0f);
+				float fObstacleRadius = GetLevel2ObstacleRadius(j);
 				XMFLOAT3 xmf3ObstaclePosition = m_ppLevel2Obstacles[j]->GetPosition();
 				float dx = xmf3ProjectilePosition.x - xmf3ObstaclePosition.x;
 				float dz = xmf3ProjectilePosition.z - xmf3ObstaclePosition.z;
@@ -1386,7 +1397,7 @@ void CScene::FireLevel2PlayerProjectileAtTarget(int nTargetIndex)
 	if (!pProjectile) return;
 
 	XMFLOAT3 xmf3TargetPosition = m_ppLevel2EnemyTanks[nTargetIndex]->GetPosition();
-	xmf3TargetPosition.y += 6.0f;
+	xmf3TargetPosition.y += 8.0f;
 	XMFLOAT3 xmf3StartPosition = m_xmf3Level2PlayerPosition;
 	xmf3StartPosition.y += 6.0f;
 	XMFLOAT3 xmf3Direction = Vector3::Subtract(xmf3TargetPosition, xmf3StartPosition);
