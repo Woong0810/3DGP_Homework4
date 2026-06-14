@@ -852,6 +852,23 @@ void CScene::ReleaseLevel1Decorations()
 	}
 	m_nLevel1Decorations = 0;
 }
+void CScene::CenterLevel2TankVisualPivot(CTankObject *pTankObject)
+{
+	if (!pTankObject || !pTankObject->m_pChild) return;
+
+	pTankObject->UpdateTransform(NULL);
+
+	CGameObject *pTurretFrame = pTankObject->FindFrame("TURRET");
+	if (!pTurretFrame) return;
+
+	XMFLOAT3 xmf3TankOrigin = pTankObject->GetPosition();
+	XMFLOAT3 xmf3TurretPosition = pTurretFrame->GetPosition();
+	XMFLOAT3 xmf3Offset = Vector3::Subtract(xmf3TurretPosition, xmf3TankOrigin);
+	XMFLOAT3 xmf3ChildLocalPosition = XMFLOAT3(pTankObject->m_pChild->m_xmf4x4Transform._41, pTankObject->m_pChild->m_xmf4x4Transform._42, pTankObject->m_pChild->m_xmf4x4Transform._43);
+
+	pTankObject->m_pChild->SetPosition(XMFLOAT3(xmf3ChildLocalPosition.x - xmf3Offset.x, xmf3ChildLocalPosition.y, xmf3ChildLocalPosition.z - xmf3Offset.z));
+	pTankObject->UpdateTransform(NULL);
+}
 void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList)
 {
 	ReleaseLevel2Objects();
@@ -882,6 +899,7 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 	pPlayerTankObject->CreateShaderVariables(pd3dDevice, pd3dCommandList, nPlayerMeshesInHierarchy, pnPlayerMaterialsInHierarchy);
 	pPlayerTankObject->SetChild(pPlayerTankModel, true);
 	pPlayerTankObject->OnInitialize();
+	CenterLevel2TankVisualPivot(pPlayerTankObject);
 	m_pLevel2PlayerTank = pPlayerTankObject;
 	m_nLevel2EnemyTanks = LEVEL2_ENEMY_TANK_COUNT;
 	m_ppLevel2EnemyTanks = new CTankObject*[m_nLevel2EnemyTanks];
@@ -901,6 +919,7 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 		pTankObject->CreateShaderVariables(pd3dDevice, pd3dCommandList, nMeshesInHierarchy, pnMaterialsInHierarchy);
 		pTankObject->SetChild(pTankModel, true);
 		pTankObject->OnInitialize();
+		CenterLevel2TankVisualPivot(pTankObject);
 		pTankObject->SetScale(2.6f, 2.6f, 2.6f);
 		pTankObject->Rotate(0.0f, (float)(i * 31), 0.0f);
 		float fTankY = (m_pLevel2Terrain) ? m_pLevel2Terrain->GetHeight(xmf3TankPositions[i].x, xmf3TankPositions[i].z) : 0.0f;

@@ -159,6 +159,7 @@ private:
 	void RenderLevel1Decorations(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
 	void ReleaseLevel1Decorations();
 	void BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList);
+	void CenterLevel2TankVisualPivot(CTankObject *pTankObject);
 	void UpdateLevel2Objects(float fTimeElapsed);
 	void RenderLevel2Objects(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
 	void ReleaseLevel2Objects();
