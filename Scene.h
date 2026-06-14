@@ -137,6 +137,7 @@ private:
 	void SetSceneMode(GAME_SCENE_MODE nSceneMode);
 	void ResetLevel1();
 	void ResetLevel2();
+	void ResetLevel3();
 	void ClampPlayerToTerrain();
 	bool ProcessLevel2Input(UCHAR *pKeysBuffer);
 	void RotateLevel2PlayerTank(float fYawDelta);
@@ -186,6 +187,13 @@ private:
 	void RenderLevel2YouWinText(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
 	void PickLevel2EnemyTank(int xClient, int yClient);
 	void UpdateLevel2TankColors();
+	void BuildLevel3Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList);
+	void UpdateLevel3Objects(float fTimeElapsed);
+	void RenderLevel3Objects(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
+	void ReleaseLevel3Objects();
+	void CheckLevel3ProjectileEnemyCollisions();
+	bool IsLevel3Cleared() const;
+	void UpdateLevel3ClearState();
 	void BuildLevel1Effects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList);
 	void ResetLevel1Effects();
 	void UpdateLevel1Effects(float fTimeElapsed);
@@ -278,6 +286,12 @@ private:
 	POINT						m_ptLevel2OldCursorPos;
 	XMFLOAT3					m_xmf3Level2PlayerPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	float						m_fLevel2PlayerYaw = 0.0f;
+	CTerrainObject				*m_pLevel3Terrain = NULL;
+	CTankObject					**m_ppLevel3EnemyTanks = NULL;
+	int							m_nLevel3EnemyTanks = 0;
+	bool						*m_pbLevel3EnemyTankAlive = NULL;
+	bool						m_bLevel3Cleared = false;
+	float						m_fLevel3ClearElapsedTime = 0.0f;
 	CEffectObject				**m_ppStartNameExplosionEffects = NULL;
 	int							m_nStartNameExplosionEffects = 0;
 	int							m_nPlayerMaxHP = 100;

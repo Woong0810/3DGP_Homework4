@@ -212,7 +212,7 @@ void CHeightMapTerrainMesh::Render(ID3D12GraphicsCommandList *pd3dCommandList, i
 	pd3dCommandList->DrawIndexedInstanced(m_nIndices, 1, 0, 0, 0);
 }
 
-CTerrainObject::CTerrainObject(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList, const char *pstrHeightMapFileName) : m_HeightMapImage(pstrHeightMapFileName)
+CTerrainObject::CTerrainObject(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList, const char *pstrHeightMapFileName, const XMFLOAT3& xmf3Scale) : m_HeightMapImage(pstrHeightMapFileName, TERRAIN_HEIGHT_MAP_WIDTH, TERRAIN_HEIGHT_MAP_LENGTH, xmf3Scale)
 {
 	SetMesh(new CHeightMapTerrainMesh(pd3dDevice, pd3dCommandList, m_HeightMapImage));
 

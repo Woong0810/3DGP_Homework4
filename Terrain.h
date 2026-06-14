@@ -63,7 +63,7 @@ protected:
 class CTerrainObject : public CGameObject
 {
 public:
-	CTerrainObject(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList, const char *pstrHeightMapFileName = "HeightMap/Level_1_terrain.raw");
+	CTerrainObject(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList, const char *pstrHeightMapFileName = "HeightMap/Level_1_terrain.raw", const XMFLOAT3& xmf3Scale = XMFLOAT3(TERRAIN_SCALE_X, TERRAIN_SCALE_Y, TERRAIN_SCALE_Z));
 	virtual ~CTerrainObject() { }
 
 	float GetHeight(float worldX, float worldZ) const;
