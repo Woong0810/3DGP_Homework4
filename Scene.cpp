@@ -275,7 +275,6 @@ bool CScene::ProcessLevel2Input(UCHAR *pKeysBuffer)
 {
 	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || !m_pLevel2PlayerTank || !m_pLevel2Terrain || !m_pPlayer) return(false);
 
-	if ((pKeysBuffer['P'] & 0xF0) && !m_bLevel2Cleared) DestroyAllLevel2EnemyTanks();
 	if ((pKeysBuffer['K'] & 0xF0) && !m_bLevel2Cleared) DestroyAllLevel2EnemyTanks();
 
 	if (pKeysBuffer['I'] & 0xF0)
@@ -2378,7 +2377,20 @@ bool CScene::OnProcessingKeyboardMessage(HWND hWnd, UINT nMessageID, WPARAM wPar
 		}
 		if ((wParam == 'N') && (m_nSceneMode == GAME_SCENE_LEVEL1))
 		{
-			SetSceneMode(GAME_SCENE_LEVEL2);
+			if (!m_bLevel1Cleared && !m_bLevel1Failed && m_pLevel1Targets)
+			{
+				for (int i = 0; i < m_nLevel1Targets; i++)
+				{
+					if (m_pLevel1Targets[i].m_bActive && !m_pLevel1Targets[i].m_bDestroying)
+					{
+						ApplyDamageToLevel1Target(i, m_pLevel1Targets[i].m_nHP);
+					}
+					m_pLevel1Targets[i].m_bActive = false;
+					m_pLevel1Targets[i].m_bDestroying = false;
+				}
+				m_nCurrentLevel1Wave = 3;
+				AdvanceLevel1WaveIfNeeded();
+			}
 			return(true);
 		}
 		if ((wParam == VK_END) && (m_nSceneMode == GAME_SCENE_MENU))
@@ -2465,8 +2477,14 @@ void CScene::AnimateObjects(float fTimeElapsed)
 	{
 		UpdateLevel2Objects(fTimeElapsed);
 		UpdateLevel2Projectiles(fTimeElapsed);
+		if (!m_bLevel2Cleared && !m_bLevel2Failed)
+		{
+			UpdateLevel2EnemyFire(fTimeElapsed);
+			UpdateLevel2AutoAttack(fTimeElapsed);
+			CheckLevel2ProjectileEnemyCollisions();
+			CheckLevel2EnemyProjectilePlayerCollisions();
+		}
 		UpdateLevel1Effects(fTimeElapsed);
-		CheckLevel2ProjectileEnemyCollisions();
 		if (m_bLevel2Cleared)
 		{
 			m_fLevel2ClearElapsedTime += fTimeElapsed;
