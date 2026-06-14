@@ -1480,6 +1480,11 @@ bool CScene::OnProcessingKeyboardMessage(HWND hWnd, UINT nMessageID, WPARAM wPar
 			SetSceneMode(GAME_SCENE_MENU);
 			return(true);
 		}
+		if ((wParam == 'N') && (m_nSceneMode == GAME_SCENE_LEVEL1))
+		{
+			SetSceneMode(GAME_SCENE_LEVEL2);
+			return(true);
+		}
 		if ((wParam == VK_END) && (m_nSceneMode == GAME_SCENE_MENU))
 		{
 			::PostQuitMessage(0);
@@ -1567,6 +1572,7 @@ void CScene::AnimateObjects(float fTimeElapsed)
 			m_fLevel1ClearElapsedTime += fTimeElapsed;
 			ResetLevel1Effects();
 			UpdateLevel1ClearText();
+			if (m_fLevel1ClearElapsedTime >= 2.0f) SetSceneMode(GAME_SCENE_LEVEL2);
 		}
 		else if (m_bLevel1Failed)
 		{
