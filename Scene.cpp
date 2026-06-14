@@ -262,7 +262,7 @@ void CScene::RotateLevel2PlayerTank(float fYawDelta)
 	if (m_fLevel2PlayerYaw > 360.0f) m_fLevel2PlayerYaw -= 360.0f;
 	if (m_fLevel2PlayerYaw < -360.0f) m_fLevel2PlayerYaw += 360.0f;
 	UpdateLevel2PlayerTankTransform(false);
-	UpdateLevel2CameraLookOnly();
+	UpdateLevel2Camera();
 }
 
 void CScene::UpdateLevel2PlayerTankTransform(bool bSyncMainPlayerPosition)
