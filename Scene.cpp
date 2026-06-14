@@ -39,6 +39,7 @@ static const int START_NAME_EXPLOSION_EFFECT_COUNT = 32;
 static const int LEVEL2_ENEMY_TANK_COUNT = 10;
 static const int LEVEL2_OBSTACLE_COUNT = 60;
 static const int LEVEL2_PROJECTILE_COUNT = 20;
+static const int LEVEL2_ENEMY_PROJECTILE_COUNT = 40;
 static float Clamp01(float fValue)
 {
 	return(max(0.0f, min(1.0f, fValue)));
@@ -219,6 +220,15 @@ void CScene::ResetLevel2()
 	m_fLevel1FailedElapsedTime = 0.0f;
 	m_bLevel2Cleared = false;
 	m_fLevel2ClearElapsedTime = 0.0f;
+	m_bLevel2Failed = false;
+	m_nLevel2SelectedEnemyTankIndex = -1;
+	m_bLevel2AutoAttack = false;
+	m_bLevel2Shield = false;
+	m_bLevel2AutoAttackKeyDown = false;
+	m_bLevel2ShieldKeyDown = false;
+	m_fLevel2AutoAttackCooldown = 0.0f;
+	m_fLevel2EnemyFireCooldown = 0.0f;
+	m_nLevel2PlayerHP = m_nLevel2PlayerMaxHP;
 	if (m_pLevel2YouWinObject) m_pLevel2YouWinObject->m_xmf4x4Transform = m_xmf4x4Level2YouWinBaseTransform;
 
 	m_pPlayer->ResetOrientation();
@@ -231,6 +241,7 @@ void CScene::ResetLevel2()
 		for (int i = 0; i < m_nLevel2EnemyTanks; i++) m_pbLevel2EnemyTankAlive[i] = true;
 	}
 	UpdateLevel2PlayerTankTransform(true);
+	UpdateLevel2TankColors();
 	UpdateLevel2Camera();
 }
 XMFLOAT3 CScene::GetDisplayPlayerPosition() const
@@ -264,7 +275,37 @@ bool CScene::ProcessLevel2Input(UCHAR *pKeysBuffer)
 {
 	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || !m_pLevel2PlayerTank || !m_pLevel2Terrain || !m_pPlayer) return(false);
 
+	if ((pKeysBuffer['P'] & 0xF0) && !m_bLevel2Cleared) DestroyAllLevel2EnemyTanks();
 	if ((pKeysBuffer['K'] & 0xF0) && !m_bLevel2Cleared) DestroyAllLevel2EnemyTanks();
+
+	if (pKeysBuffer['I'] & 0xF0)
+	{
+		if (!m_bLevel2AutoAttackKeyDown)
+		{
+			m_bLevel2AutoAttack = !m_bLevel2AutoAttack;
+			m_bLevel2AutoAttackKeyDown = true;
+		}
+	}
+	else
+	{
+		m_bLevel2AutoAttackKeyDown = false;
+	}
+
+	if (pKeysBuffer['O'] & 0xF0)
+	{
+		if (!m_bLevel2ShieldKeyDown)
+		{
+			m_bLevel2Shield = !m_bLevel2Shield;
+			m_bLevel2ShieldKeyDown = true;
+			UpdateLevel2TankColors();
+		}
+	}
+	else
+	{
+		m_bLevel2ShieldKeyDown = false;
+	}
+
+	if (m_bLevel2Cleared || m_bLevel2Failed) return(true);
 	if (pKeysBuffer[VK_SPACE] & 0xF0) FireLevel2PlayerProjectile();
 
 	XMFLOAT3 xmf3MoveDirection = XMFLOAT3(0.0f, 0.0f, 0.0f);
@@ -272,10 +313,10 @@ bool CScene::ProcessLevel2Input(UCHAR *pKeysBuffer)
 	XMFLOAT3 xmf3Forward = XMFLOAT3(sinf(fYawRadians), 0.0f, cosf(fYawRadians));
 	XMFLOAT3 xmf3Right = XMFLOAT3(cosf(fYawRadians), 0.0f, -sinf(fYawRadians));
 
-	if ((pKeysBuffer['W'] & 0xF0) || (pKeysBuffer[VK_UP] & 0xF0)) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Forward);
-	if ((pKeysBuffer['S'] & 0xF0) || (pKeysBuffer[VK_DOWN] & 0xF0)) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Forward, -1.0f);
-	if ((pKeysBuffer['D'] & 0xF0) || (pKeysBuffer[VK_RIGHT] & 0xF0)) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Right);
-	if ((pKeysBuffer['A'] & 0xF0) || (pKeysBuffer[VK_LEFT] & 0xF0)) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Right, -1.0f);
+	if (pKeysBuffer['W'] & 0xF0) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Forward);
+	if (pKeysBuffer['S'] & 0xF0) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Forward, -1.0f);
+	if (pKeysBuffer['D'] & 0xF0) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Right);
+	if (pKeysBuffer['A'] & 0xF0) xmf3MoveDirection = Vector3::Add(xmf3MoveDirection, xmf3Right, -1.0f);
 
 	if (Vector3::Length(xmf3MoveDirection) > 0.001f)
 	{
@@ -293,10 +334,9 @@ bool CScene::ProcessLevel2Input(UCHAR *pKeysBuffer)
 
 	return(true);
 }
-
 void CScene::RotateLevel2PlayerTank(float fYawDelta)
 {
-	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || !m_pLevel2PlayerTank || !m_pPlayer) return;
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_pLevel2PlayerTank || !m_pPlayer) return;
 
 	m_fLevel2PlayerYaw += fYawDelta;
 	if (m_fLevel2PlayerYaw > 360.0f) m_fLevel2PlayerYaw -= 360.0f;
@@ -1006,7 +1046,7 @@ void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandL
 
 void CScene::UpdateLevel2Objects(float fTimeElapsed)
 {
-	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || !m_pPlayer || !m_ppLevel2EnemyTanks) return;
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_pPlayer || !m_ppLevel2EnemyTanks) return;
 
 	XMFLOAT3 xmf3PlayerPosition = m_xmf3Level2PlayerPosition;
 	for (int i = 0; i < m_nLevel2EnemyTanks; i++)
@@ -1049,6 +1089,70 @@ void CScene::RenderLevel2Objects(ID3D12GraphicsCommandList *pd3dCommandList, CCa
 	RenderLevel1Effects(pd3dCommandList, pCamera);
 }
 
+void CScene::UpdateLevel2TankColors()
+{
+	if (m_pLevel2PlayerTank)
+	{
+		XMFLOAT4 xmf4PlayerEmissive = m_bLevel2Shield ? XMFLOAT4(0.0f, 0.35f, 0.40f, 1.0f) : XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
+		SetObjectMaterialColors(m_pLevel2PlayerTank, XMFLOAT4(0.03f, 0.12f, 0.13f, 1.0f), XMFLOAT4(0.00f, 0.28f, 0.30f, 1.0f), XMFLOAT4(0.12f, 0.25f, 0.25f, 16.0f), xmf4PlayerEmissive);
+	}
+
+	if (!m_ppLevel2EnemyTanks) return;
+	for (int i = 0; i < m_nLevel2EnemyTanks; i++)
+	{
+		if (!m_ppLevel2EnemyTanks[i]) continue;
+
+		XMFLOAT3 xmf3Position = m_ppLevel2EnemyTanks[i]->GetPosition();
+		float r = Clamp01((xmf3Position.x + 450.0f) / 900.0f);
+		float b = Clamp01((xmf3Position.z + 450.0f) / 900.0f);
+		float g = Clamp01(0.25f + 0.5f * (1.0f - fabsf(r - b)));
+		XMFLOAT4 xmf4Emissive = (i == m_nLevel2SelectedEnemyTankIndex) ? XMFLOAT4(0.45f, 0.36f, 0.02f, 1.0f) : XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
+		SetObjectMaterialColors(m_ppLevel2EnemyTanks[i], XMFLOAT4(r * 0.35f, g * 0.35f, b * 0.35f, 1.0f), XMFLOAT4(r, g, b, 1.0f), XMFLOAT4(0.18f, 0.18f, 0.18f, 16.0f), xmf4Emissive);
+	}
+}
+
+void CScene::PickLevel2EnemyTank(int xClient, int yClient)
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_pPlayer || !m_ppLevel2EnemyTanks || !m_pbLevel2EnemyTankAlive) return;
+
+	CCamera *pCamera = m_pPlayer->GetCamera();
+	if (!pCamera) return;
+
+	D3D12_VIEWPORT d3dViewport = pCamera->GetViewport();
+	XMFLOAT4X4 xmf4x4Projection = pCamera->GetProjectionMatrix();
+	XMFLOAT4X4 xmf4x4View = pCamera->GetViewMatrix();
+	float fViewportWidth = (d3dViewport.Width > 1.0f) ? d3dViewport.Width : (float)FRAME_BUFFER_WIDTH;
+	float fViewportHeight = (d3dViewport.Height > 1.0f) ? d3dViewport.Height : (float)FRAME_BUFFER_HEIGHT;
+
+	float x = (((2.0f * (float)xClient) / fViewportWidth) - 1.0f) / xmf4x4Projection._11;
+	float y = -(((2.0f * (float)yClient) / fViewportHeight) - 1.0f) / xmf4x4Projection._22;
+	XMVECTOR xmvRayOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+	XMVECTOR xmvRayDirection = XMVectorSet(x, y, 1.0f, 0.0f);
+
+	XMMATRIX xmmtxView = XMLoadFloat4x4(&xmf4x4View);
+	XMMATRIX xmmtxInverseView = XMMatrixInverse(NULL, xmmtxView);
+	xmvRayOrigin = XMVector3TransformCoord(xmvRayOrigin, xmmtxInverseView);
+	xmvRayDirection = XMVector3Normalize(XMVector3TransformNormal(xmvRayDirection, xmmtxInverseView));
+
+	int nSelectedIndex = -1;
+	float fNearestDistance = 1.0e30f;
+	for (int i = 0; i < m_nLevel2EnemyTanks; i++)
+	{
+		if (!m_ppLevel2EnemyTanks[i] || !m_pbLevel2EnemyTankAlive[i]) continue;
+
+		XMFLOAT3 xmf3TankPosition = m_ppLevel2EnemyTanks[i]->GetPosition();
+		BoundingBox tankBox(xmf3TankPosition, XMFLOAT3(18.0f, 9.0f, 22.0f));
+		float fDistance = 0.0f;
+		if (tankBox.Intersects(xmvRayOrigin, xmvRayDirection, fDistance) && (fDistance < fNearestDistance))
+		{
+			fNearestDistance = fDistance;
+			nSelectedIndex = i;
+		}
+	}
+
+	m_nLevel2SelectedEnemyTankIndex = nSelectedIndex;
+	UpdateLevel2TankColors();
+}
 void CScene::ReleaseLevel2Objects()
 {
 	if (m_pLevel2Terrain)
@@ -1094,7 +1198,17 @@ void CScene::BuildLevel2Projectiles(ID3D12Device *pd3dDevice, ID3D12GraphicsComm
 		m_ppLevel2Projectiles[i] = new CProjectileObject(pd3dDevice, pd3dCommandList, 0.8f, 0.8f, 8.0f, XMFLOAT4(0.9f, 0.75f, 0.25f, 1.0f), XMFLOAT4(1.0f, 0.85f, 0.15f, 1.0f), XMFLOAT4(0.35f, 0.25f, 0.03f, 1.0f), XMFLOAT4(0.6f, 0.45f, 0.1f, 16.0f), 420.0f, 3.0f, 4.0f, 1);
 		m_ppLevel2Projectiles[i]->CreateShaderVariables(pd3dDevice, pd3dCommandList, 1, pnProjectileMaterials);
 	}
+
+	m_nLevel2EnemyProjectiles = LEVEL2_ENEMY_PROJECTILE_COUNT;
+	m_ppLevel2EnemyProjectiles = new CProjectileObject*[m_nLevel2EnemyProjectiles];
+	for (int i = 0; i < m_nLevel2EnemyProjectiles; i++)
+	{
+		m_ppLevel2EnemyProjectiles[i] = new CProjectileObject(pd3dDevice, pd3dCommandList, 0.7f, 0.7f, 6.0f, XMFLOAT4(0.75f, 0.12f, 0.08f, 1.0f), XMFLOAT4(1.0f, 0.18f, 0.05f, 1.0f), XMFLOAT4(0.45f, 0.04f, 0.01f, 1.0f), XMFLOAT4(0.6f, 0.10f, 0.02f, 12.0f), 260.0f, 4.0f, 3.0f, 10);
+		m_ppLevel2EnemyProjectiles[i]->CreateShaderVariables(pd3dDevice, pd3dCommandList, 1, pnProjectileMaterials);
+	}
 	m_fLevel2ProjectileFireCooldown = 0.0f;
+	m_fLevel2EnemyFireCooldown = 0.0f;
+	m_fLevel2AutoAttackCooldown = 0.0f;
 }
 
 void CScene::ResetLevel2Projectiles()
@@ -1103,26 +1217,50 @@ void CScene::ResetLevel2Projectiles()
 	{
 		for (int i = 0; i < m_nLevel2Projectiles; i++) if (m_ppLevel2Projectiles[i]) m_ppLevel2Projectiles[i]->Reset();
 	}
+	if (m_ppLevel2EnemyProjectiles)
+	{
+		for (int i = 0; i < m_nLevel2EnemyProjectiles; i++) if (m_ppLevel2EnemyProjectiles[i]) m_ppLevel2EnemyProjectiles[i]->Reset();
+	}
 	m_fLevel2ProjectileFireCooldown = 0.0f;
+	m_fLevel2EnemyFireCooldown = 0.0f;
+	m_fLevel2AutoAttackCooldown = 0.0f;
 }
 
 void CScene::UpdateLevel2Projectiles(float fTimeElapsed)
 {
 	if (m_fLevel2ProjectileFireCooldown > 0.0f) m_fLevel2ProjectileFireCooldown -= fTimeElapsed;
-	if (!m_ppLevel2Projectiles) return;
-
-	for (int i = 0; i < m_nLevel2Projectiles; i++) if (m_ppLevel2Projectiles[i] && m_ppLevel2Projectiles[i]->IsActive()) m_ppLevel2Projectiles[i]->Animate(fTimeElapsed, NULL);
+	if (m_ppLevel2Projectiles)
+	{
+		for (int i = 0; i < m_nLevel2Projectiles; i++) if (m_ppLevel2Projectiles[i] && m_ppLevel2Projectiles[i]->IsActive()) m_ppLevel2Projectiles[i]->Animate(fTimeElapsed, NULL);
+	}
+	if (m_ppLevel2EnemyProjectiles)
+	{
+		for (int i = 0; i < m_nLevel2EnemyProjectiles; i++) if (m_ppLevel2EnemyProjectiles[i] && m_ppLevel2EnemyProjectiles[i]->IsActive()) m_ppLevel2EnemyProjectiles[i]->Animate(fTimeElapsed, NULL);
+	}
 }
 
 void CScene::RenderLevel2Projectiles(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera)
 {
-	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || !m_ppLevel2Projectiles) return;
+	if (m_nSceneMode != GAME_SCENE_LEVEL2) return;
 
-	for (int i = 0; i < m_nLevel2Projectiles; i++)
+	if (m_ppLevel2Projectiles)
 	{
-		if (m_ppLevel2Projectiles[i] && m_ppLevel2Projectiles[i]->IsActive())
+		for (int i = 0; i < m_nLevel2Projectiles; i++)
 		{
-			m_ppLevel2Projectiles[i]->Render(pd3dCommandList, pCamera, m_ppLevel2Projectiles[i]->m_ppd3dcbInstancingGameObjects, m_ppLevel2Projectiles[i]->m_ppcbMappedInstancingGameObjects);
+			if (m_ppLevel2Projectiles[i] && m_ppLevel2Projectiles[i]->IsActive())
+			{
+				m_ppLevel2Projectiles[i]->Render(pd3dCommandList, pCamera, m_ppLevel2Projectiles[i]->m_ppd3dcbInstancingGameObjects, m_ppLevel2Projectiles[i]->m_ppcbMappedInstancingGameObjects);
+			}
+		}
+	}
+	if (m_ppLevel2EnemyProjectiles)
+	{
+		for (int i = 0; i < m_nLevel2EnemyProjectiles; i++)
+		{
+			if (m_ppLevel2EnemyProjectiles[i] && m_ppLevel2EnemyProjectiles[i]->IsActive())
+			{
+				m_ppLevel2EnemyProjectiles[i]->Render(pd3dCommandList, pCamera, m_ppLevel2EnemyProjectiles[i]->m_ppd3dcbInstancingGameObjects, m_ppLevel2EnemyProjectiles[i]->m_ppcbMappedInstancingGameObjects);
+			}
 		}
 	}
 }
@@ -1136,12 +1274,20 @@ void CScene::ReleaseLevel2Projectiles()
 		m_ppLevel2Projectiles = NULL;
 	}
 	m_nLevel2Projectiles = 0;
+	if (m_ppLevel2EnemyProjectiles)
+	{
+		for (int i = 0; i < m_nLevel2EnemyProjectiles; i++) if (m_ppLevel2EnemyProjectiles[i]) m_ppLevel2EnemyProjectiles[i]->Release();
+		delete[] m_ppLevel2EnemyProjectiles;
+		m_ppLevel2EnemyProjectiles = NULL;
+	}
+	m_nLevel2EnemyProjectiles = 0;
 	m_fLevel2ProjectileFireCooldown = 0.0f;
+	m_fLevel2EnemyFireCooldown = 0.0f;
+	m_fLevel2AutoAttackCooldown = 0.0f;
 }
-
 void CScene::FireLevel2PlayerProjectile()
 {
-	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || !m_ppLevel2Projectiles || (m_fLevel2ProjectileFireCooldown > 0.0f)) return;
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_ppLevel2Projectiles || (m_fLevel2ProjectileFireCooldown > 0.0f)) return;
 
 	CProjectileObject *pProjectile = NULL;
 	for (int i = 0; i < m_nLevel2Projectiles; i++)
@@ -1165,9 +1311,128 @@ void CScene::FireLevel2PlayerProjectile()
 	m_fLevel2ProjectileFireCooldown = 0.35f;
 }
 
+void CScene::FireLevel2PlayerProjectileAtTarget(int nTargetIndex)
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_ppLevel2Projectiles || !m_ppLevel2EnemyTanks || !m_pbLevel2EnemyTankAlive) return;
+	if ((nTargetIndex < 0) || (nTargetIndex >= m_nLevel2EnemyTanks)) return;
+	if (!m_ppLevel2EnemyTanks[nTargetIndex] || !m_pbLevel2EnemyTankAlive[nTargetIndex]) return;
+
+	CProjectileObject *pProjectile = NULL;
+	for (int i = 0; i < m_nLevel2Projectiles; i++)
+	{
+		if (m_ppLevel2Projectiles[i] && !m_ppLevel2Projectiles[i]->IsActive())
+		{
+			pProjectile = m_ppLevel2Projectiles[i];
+			break;
+		}
+	}
+	if (!pProjectile) return;
+
+	XMFLOAT3 xmf3TargetPosition = m_ppLevel2EnemyTanks[nTargetIndex]->GetPosition();
+	XMFLOAT3 xmf3Direction = Vector3::Subtract(xmf3TargetPosition, m_xmf3Level2PlayerPosition);
+	xmf3Direction.y = 0.0f;
+	if (Vector3::Length(xmf3Direction) <= 0.001f) return;
+	xmf3Direction = Vector3::Normalize(xmf3Direction);
+
+	const float fMuzzleForwardOffset = 14.0f;
+	const float fMuzzleHeightOffset = 6.0f;
+	XMFLOAT3 xmf3StartPosition = Vector3::Add(m_xmf3Level2PlayerPosition, Vector3::ScalarProduct(xmf3Direction, fMuzzleForwardOffset, false));
+	xmf3StartPosition.y += fMuzzleHeightOffset;
+	pProjectile->Fire(xmf3StartPosition, xmf3Direction);
+}
+
+void CScene::FireLevel2EnemyProjectile(int nEnemyIndex)
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_ppLevel2EnemyProjectiles || !m_ppLevel2EnemyTanks || !m_pbLevel2EnemyTankAlive) return;
+	if ((nEnemyIndex < 0) || (nEnemyIndex >= m_nLevel2EnemyTanks)) return;
+	if (!m_ppLevel2EnemyTanks[nEnemyIndex] || !m_pbLevel2EnemyTankAlive[nEnemyIndex]) return;
+
+	CProjectileObject *pProjectile = NULL;
+	for (int i = 0; i < m_nLevel2EnemyProjectiles; i++)
+	{
+		if (m_ppLevel2EnemyProjectiles[i] && !m_ppLevel2EnemyProjectiles[i]->IsActive())
+		{
+			pProjectile = m_ppLevel2EnemyProjectiles[i];
+			break;
+		}
+	}
+	if (!pProjectile) return;
+
+	XMFLOAT3 xmf3EnemyPosition = m_ppLevel2EnemyTanks[nEnemyIndex]->GetPosition();
+	XMFLOAT3 xmf3Direction = Vector3::Subtract(m_xmf3Level2PlayerPosition, xmf3EnemyPosition);
+	if (Vector3::Length(xmf3Direction) <= 0.001f) return;
+	xmf3Direction = Vector3::Normalize(xmf3Direction);
+
+	XMFLOAT3 xmf3StartPosition = Vector3::Add(xmf3EnemyPosition, Vector3::ScalarProduct(xmf3Direction, 12.0f, false));
+	xmf3StartPosition.y += 6.0f;
+	pProjectile->Fire(xmf3StartPosition, xmf3Direction);
+}
+
+void CScene::UpdateLevel2EnemyFire(float fTimeElapsed)
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_ppLevel2EnemyTanks || !m_pbLevel2EnemyTankAlive) return;
+
+	m_fLevel2EnemyFireCooldown -= fTimeElapsed;
+	if (m_fLevel2EnemyFireCooldown > 0.0f) return;
+
+	for (int i = 0; i < m_nLevel2EnemyTanks; i++)
+	{
+		if (m_ppLevel2EnemyTanks[i] && m_pbLevel2EnemyTankAlive[i]) FireLevel2EnemyProjectile(i);
+	}
+	m_fLevel2EnemyFireCooldown = 1.8f;
+}
+
+void CScene::UpdateLevel2AutoAttack(float fTimeElapsed)
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_bLevel2AutoAttack) return;
+	if ((m_nLevel2SelectedEnemyTankIndex < 0) || (m_nLevel2SelectedEnemyTankIndex >= m_nLevel2EnemyTanks)) return;
+	if (!m_pbLevel2EnemyTankAlive || !m_pbLevel2EnemyTankAlive[m_nLevel2SelectedEnemyTankIndex]) return;
+
+	m_fLevel2AutoAttackCooldown -= fTimeElapsed;
+	if (m_fLevel2AutoAttackCooldown > 0.0f) return;
+
+	FireLevel2PlayerProjectileAtTarget(m_nLevel2SelectedEnemyTankIndex);
+	m_fLevel2AutoAttackCooldown = 0.55f;
+}
+
+void CScene::CheckLevel2EnemyProjectilePlayerCollisions()
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_ppLevel2EnemyProjectiles) return;
+
+	const float fPlayerHitRadius = 9.0f;
+	for (int i = 0; i < m_nLevel2EnemyProjectiles; i++)
+	{
+		CProjectileObject *pProjectile = m_ppLevel2EnemyProjectiles[i];
+		if (!pProjectile || !pProjectile->IsActive()) continue;
+
+		float fHitDistance = pProjectile->GetCollisionRadius() + fPlayerHitRadius;
+		float fDistance = Vector3::Length(Vector3::Subtract(pProjectile->GetPosition(), m_xmf3Level2PlayerPosition));
+		if (fDistance <= fHitDistance)
+		{
+			int nDamage = pProjectile->GetDamage();
+			pProjectile->Reset();
+			ApplyDamageToLevel2Player(nDamage);
+		}
+	}
+}
+
+void CScene::ApplyDamageToLevel2Player(int nDamage)
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed) return;
+	if (m_bLevel2Shield) return;
+
+	SpawnPlayerHitEffect(m_xmf3Level2PlayerPosition);
+	m_nLevel2PlayerHP -= nDamage;
+	if (m_nLevel2PlayerHP < 0) m_nLevel2PlayerHP = 0;
+	if (m_nLevel2PlayerHP <= 0)
+	{
+		m_bLevel2Failed = true;
+		ResetLevel2Projectiles();
+	}
+}
 void CScene::CheckLevel2ProjectileEnemyCollisions()
 {
-	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || !m_ppLevel2Projectiles || !m_ppLevel2EnemyTanks || !m_pbLevel2EnemyTankAlive) return;
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || m_bLevel2Cleared || m_bLevel2Failed || !m_ppLevel2Projectiles || !m_ppLevel2EnemyTanks || !m_pbLevel2EnemyTankAlive) return;
 
 	const float fEnemyTankHitRadius = 12.0f;
 	for (int i = 0; i < m_nLevel2Projectiles; i++)
@@ -1200,7 +1465,9 @@ void CScene::DestroyLevel2EnemyTank(int nEnemyIndex)
 
 	XMFLOAT3 xmf3EnemyPosition = m_ppLevel2EnemyTanks[nEnemyIndex]->GetPosition();
 	m_pbLevel2EnemyTankAlive[nEnemyIndex] = false;
+	if (m_nLevel2SelectedEnemyTankIndex == nEnemyIndex) m_nLevel2SelectedEnemyTankIndex = -1;
 	SpawnLevel1ExplosionEffect(xmf3EnemyPosition);
+	UpdateLevel2TankColors();
 	UpdateLevel2ClearState();
 }
 
@@ -1233,8 +1500,13 @@ void CScene::UpdateLevel2ClearState()
 	if (IsLevel2Cleared())
 	{
 		m_bLevel2Cleared = true;
+		m_bLevel2Failed = false;
 		m_fLevel2ClearElapsedTime = 0.0f;
+		m_bLevel2AutoAttack = false;
+		m_bLevel2Shield = false;
+		m_nLevel2SelectedEnemyTankIndex = -1;
 		ResetLevel2Projectiles();
+		UpdateLevel2TankColors();
 		UpdateLevel2YouWinText();
 	}
 }
@@ -1553,8 +1825,10 @@ int CScene::GetHudEnemyTargetIndex() const
 
 void CScene::UpdateLevel1HudBars()
 {
-	if ((m_nSceneMode != GAME_SCENE_LEVEL1) || m_bLevel1Cleared || !m_ppHudBars || (m_nHudBars < HUD_BAR_COUNT)) return;
+	if (!m_ppHudBars || (m_nHudBars < HUD_BAR_COUNT)) return;
 	if (!m_ppHudBars[HUD_PLAYER_BACKGROUND] || !m_ppHudBars[HUD_PLAYER_GAUGE] || !m_ppHudBars[HUD_ENEMY_BACKGROUND] || !m_ppHudBars[HUD_ENEMY_GAUGE]) return;
+	if ((m_nSceneMode == GAME_SCENE_LEVEL1) && m_bLevel1Cleared) return;
+	if ((m_nSceneMode != GAME_SCENE_LEVEL1) && (m_nSceneMode != GAME_SCENE_LEVEL2)) return;
 
 	const float fHudFullWidth = 225.0f;
 	const float fHudHeight = 3.5f;
@@ -1568,17 +1842,24 @@ void CScene::UpdateLevel1HudBars()
 	XMFLOAT3 xmf3HudUp = XMFLOAT3(0.0f, 1.0f, 0.0f);
 	XMFLOAT3 xmf3HudLook = XMFLOAT3(0.0f, 0.0f, 1.0f);
 
-	float fPlayerRatio = (m_nPlayerMaxHP > 0) ? ((float)m_nPlayerHP / (float)m_nPlayerMaxHP) : 0.0f;
+	float fPlayerRatio = 0.0f;
+	float fEnemyRatio = 0.0f;
+	if (m_nSceneMode == GAME_SCENE_LEVEL2)
+	{
+		fPlayerRatio = (m_nLevel2PlayerMaxHP > 0) ? ((float)m_nLevel2PlayerHP / (float)m_nLevel2PlayerMaxHP) : 0.0f;
+	}
+	else
+	{
+		fPlayerRatio = (m_nPlayerMaxHP > 0) ? ((float)m_nPlayerHP / (float)m_nPlayerMaxHP) : 0.0f;
+		int nEnemyTargetIndex = GetHudEnemyTargetIndex();
+		if ((nEnemyTargetIndex >= 0) && (nEnemyTargetIndex < m_nLevel1Targets))
+		{
+			const SLevel1TargetState& target = m_pLevel1Targets[nEnemyTargetIndex];
+			fEnemyRatio = (target.m_nMaxHP > 0) ? ((float)target.m_nHP / (float)target.m_nMaxHP) : 0.0f;
+		}
+	}
 	if (fPlayerRatio < 0.0f) fPlayerRatio = 0.0f;
 	if (fPlayerRatio > 1.0f) fPlayerRatio = 1.0f;
-
-	int nEnemyTargetIndex = GetHudEnemyTargetIndex();
-	float fEnemyRatio = 0.0f;
-	if ((nEnemyTargetIndex >= 0) && (nEnemyTargetIndex < m_nLevel1Targets))
-	{
-		const SLevel1TargetState& target = m_pLevel1Targets[nEnemyTargetIndex];
-		fEnemyRatio = (target.m_nMaxHP > 0) ? ((float)target.m_nHP / (float)target.m_nMaxHP) : 0.0f;
-	}
 	if (fEnemyRatio < 0.0f) fEnemyRatio = 0.0f;
 	if (fEnemyRatio > 1.0f) fEnemyRatio = 1.0f;
 
@@ -1592,12 +1873,12 @@ void CScene::UpdateLevel1HudBars()
 	m_ppHudBars[HUD_ENEMY_BACKGROUND]->SetHudTransform(XMFLOAT3(0.0f, fEnemyHudY, fBackgroundZ), xmf3HudRight, xmf3HudUp, xmf3HudLook, fHudFullWidth, fHudHeight, fHudDepth);
 	m_ppHudBars[HUD_ENEMY_GAUGE]->SetHudTransform(XMFLOAT3(fEnemyGaugeCenterX, fEnemyHudY, fGaugeZ), xmf3HudRight, xmf3HudUp, xmf3HudLook, fEnemyGaugeWidth, fHudHeight, fHudDepth);
 }
-
 void CScene::RenderLevel1HudBars(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera)
 {
-	if ((m_nSceneMode != GAME_SCENE_LEVEL1) || m_bLevel1Cleared || !m_ppHudBars) return;
+	if (((m_nSceneMode != GAME_SCENE_LEVEL1) && (m_nSceneMode != GAME_SCENE_LEVEL2)) || ((m_nSceneMode == GAME_SCENE_LEVEL1) && m_bLevel1Cleared) || ((m_nSceneMode == GAME_SCENE_LEVEL2) && m_bLevel2Cleared) || !m_ppHudBars) return;
 	for (int i = 0; i < m_nHudBars; i++)
 	{
+		if ((m_nSceneMode == GAME_SCENE_LEVEL2) && ((i == HUD_ENEMY_BACKGROUND) || (i == HUD_ENEMY_GAUGE))) continue;
 		if (m_ppHudBars[i])
 		{
 			m_ppHudBars[i]->UpdateTransform(NULL);
@@ -1608,7 +1889,7 @@ void CScene::RenderLevel1HudBars(ID3D12GraphicsCommandList *pd3dCommandList, CCa
 
 void CScene::RenderLevel1HudOverlay(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera)
 {
-	if ((m_nSceneMode != GAME_SCENE_LEVEL1) || m_bLevel1Cleared || m_bLevel1Failed || !pd3dCommandList || !pCamera || !m_ppHudBars || !m_pHudCamera) return;
+	if (((m_nSceneMode != GAME_SCENE_LEVEL1) && (m_nSceneMode != GAME_SCENE_LEVEL2)) || ((m_nSceneMode == GAME_SCENE_LEVEL1) && (m_bLevel1Cleared || m_bLevel1Failed)) || ((m_nSceneMode == GAME_SCENE_LEVEL2) && m_bLevel2Cleared) || !pd3dCommandList || !pCamera || !m_ppHudBars || !m_pHudCamera) return;
 
 	UpdateLevel1HudBars();
 
@@ -1972,6 +2253,7 @@ void CScene::ReleaseShaderVariables()
 	for (int i = 0; i < m_nProjectiles; i++) if (m_ppProjectiles[i]) m_ppProjectiles[i]->ReleaseShaderVariables();
 	for (int i = 0; i < m_nEnemyProjectiles; i++) if (m_ppEnemyProjectiles[i]) m_ppEnemyProjectiles[i]->ReleaseShaderVariables();
 	for (int i = 0; i < m_nLevel2Projectiles; i++) if (m_ppLevel2Projectiles[i]) m_ppLevel2Projectiles[i]->ReleaseShaderVariables();
+	for (int i = 0; i < m_nLevel2EnemyProjectiles; i++) if (m_ppLevel2EnemyProjectiles && m_ppLevel2EnemyProjectiles[i]) m_ppLevel2EnemyProjectiles[i]->ReleaseShaderVariables();
 	if (m_pLevel2YouWinObject) m_pLevel2YouWinObject->ReleaseShaderVariables();
 	for (int i = 0; i < m_nHudBars; i++) if (m_ppHudBars[i]) m_ppHudBars[i]->ReleaseShaderVariables();
 	for (int i = 0; i < m_nLevel1Decorations; i++) if (m_ppLevel1Decorations[i]) m_ppLevel1Decorations[i]->ReleaseShaderVariables();
@@ -1989,6 +2271,7 @@ void CScene::ReleaseUploadBuffers()
 	for (int i = 0; i < m_nProjectiles; i++) if (m_ppProjectiles[i]) m_ppProjectiles[i]->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nEnemyProjectiles; i++) if (m_ppEnemyProjectiles[i]) m_ppEnemyProjectiles[i]->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nLevel2Projectiles; i++) if (m_ppLevel2Projectiles[i]) m_ppLevel2Projectiles[i]->ReleaseUploadBuffers();
+	for (int i = 0; i < m_nLevel2EnemyProjectiles; i++) if (m_ppLevel2EnemyProjectiles && m_ppLevel2EnemyProjectiles[i]) m_ppLevel2EnemyProjectiles[i]->ReleaseUploadBuffers();
 	if (m_pLevel2YouWinObject) m_pLevel2YouWinObject->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nHudBars; i++) if (m_ppHudBars[i]) m_ppHudBars[i]->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nLevel1Decorations; i++) if (m_ppLevel1Decorations[i]) m_ppLevel1Decorations[i]->ReleaseUploadBuffers();
@@ -2006,6 +2289,12 @@ bool CScene::OnProcessingMouseMessage(HWND hWnd, UINT nMessageID, WPARAM wParam,
 	int y = HIWORD(lParam);
 	if (m_nSceneMode == GAME_SCENE_LEVEL2)
 	{
+		if (nMessageID == WM_RBUTTONDOWN)
+		{
+			PickLevel2EnemyTank(x, y);
+			return(true);
+		}
+		if (m_bLevel2Cleared || m_bLevel2Failed) return(true);
 		if (nMessageID == WM_LBUTTONDOWN)
 		{
 			m_bLevel2MouseDragging = true;
