@@ -103,8 +103,8 @@ public:
 	bool IsLevelPlaying() const { return(m_nSceneMode >= GAME_SCENE_TUTORIAL); }
 	bool IsLevel1Cleared() const { return(m_bLevel1Cleared); }
 	bool IsLevel1Failed() const { return(m_bLevel1Failed); }
-	bool ShouldRenderMainPlayer() const { return(m_nSceneMode != GAME_SCENE_LEVEL2); }
-	bool ShouldUpdateMainPlayer() const { return(m_nSceneMode != GAME_SCENE_LEVEL2); }
+	bool ShouldRenderMainPlayer() const { return((m_nSceneMode != GAME_SCENE_LEVEL2) && ((m_nSceneMode != GAME_SCENE_LEVEL3) || (!m_bLevel3Cleared && !m_bLevel3Failed))); }
+	bool ShouldUpdateMainPlayer() const { return((m_nSceneMode != GAME_SCENE_LEVEL2) && ((m_nSceneMode != GAME_SCENE_LEVEL3) || (!m_bLevel3Cleared && !m_bLevel3Failed))); }
 	XMFLOAT3 GetDisplayPlayerPosition() const;
 	void GetClearColor(float pfClearColor[4]) const;
     void AnimateObjects(float fTimeElapsed);
@@ -191,7 +191,10 @@ private:
 	void UpdateLevel3Objects(float fTimeElapsed);
 	void RenderLevel3Objects(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
 	void ReleaseLevel3Objects();
+	void FireLevel3EnemyProjectile(int nEnemyIndex);
+	void UpdateLevel3EnemyFire(float fTimeElapsed);
 	void CheckLevel3ProjectileEnemyCollisions();
+	void CheckLevel3EnemyProjectilePlayerCollisions();
 	bool IsLevel3Cleared() const;
 	void UpdateLevel3ClearState();
 	void BuildLevel1Effects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList);
@@ -292,6 +295,9 @@ private:
 	bool						*m_pbLevel3EnemyTankAlive = NULL;
 	bool						m_bLevel3Cleared = false;
 	float						m_fLevel3ClearElapsedTime = 0.0f;
+	bool						m_bLevel3Failed = false;
+	float						m_fLevel3FailedElapsedTime = 0.0f;
+	float						m_fLevel3EnemyFireCooldown = 0.0f;
 	CEffectObject				**m_ppStartNameExplosionEffects = NULL;
 	int							m_nStartNameExplosionEffects = 0;
 	int							m_nPlayerMaxHP = 100;
