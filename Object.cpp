@@ -804,6 +804,7 @@ CHummerObject::~CHummerObject()
 //
 CTankObject::CTankObject()
 {
+	m_xmf4x4TurretBaseTransform = Matrix4x4::Identity();
 }
 
 CTankObject::~CTankObject()
@@ -812,16 +813,26 @@ CTankObject::~CTankObject()
 
 void CTankObject::OnInitialize()
 {
+	if (m_pTurretFrame) m_xmf4x4TurretBaseTransform = m_pTurretFrame->m_xmf4x4Transform;
+}
+
+void CTankObject::AimTurretAt(const XMFLOAT3& xmf3TargetPosition)
+{
+	if (!m_pTurretFrame) return;
+
+	XMFLOAT3 xmf3TankPosition = GetPosition();
+	float fDeltaX = xmf3TargetPosition.x - xmf3TankPosition.x;
+	float fDeltaZ = xmf3TargetPosition.z - xmf3TankPosition.z;
+	if ((fabsf(fDeltaX) < 0.001f) && (fabsf(fDeltaZ) < 0.001f)) return;
+
+	float fYaw = atan2f(fDeltaX, fDeltaZ);
+	XMMATRIX xmmtxRotate = XMMatrixRotationY(fYaw);
+	m_pTurretFrame->m_xmf4x4Transform = Matrix4x4::Multiply(xmmtxRotate, m_xmf4x4TurretBaseTransform);
+	m_pTurretFrame->UpdateTransform(&m_xmf4x4World);
 }
 
 void CTankObject::Animate(float fTimeElapsed, XMFLOAT4X4* pxmf4x4Parent)
 {
-	if (m_pTurretFrame)
-	{
-		XMMATRIX xmmtxRotate = XMMatrixRotationY(XMConvertToRadians(30.0f) * fTimeElapsed);
-		m_pTurretFrame->m_xmf4x4Transform = Matrix4x4::Multiply(xmmtxRotate, m_pTurretFrame->m_xmf4x4Transform);
-	}
-
 	CGameObject::Animate(fTimeElapsed, pxmf4x4Parent);
 }
 
@@ -840,4 +851,5 @@ void CM26Object::OnInitialize()
 	m_pTurretFrame = FindFrame("TURRET");
 	m_pCannonFrame = FindFrame("cannon");	
 	m_pGunFrame = FindFrame("gun");
+	CTankObject::OnInitialize();
 }

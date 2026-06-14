@@ -41,6 +41,7 @@ class CTerrainObject;
 class CProjectileObject;
 class CHudBarObject;
 class CEffectObject;
+class CTankObject;
 
 struct SLevel1TargetState
 {
@@ -132,6 +133,7 @@ private:
 	CGameObject *CreateTextObject(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList, const char *pstrFileName, const XMFLOAT3& xmf3Position, float fScale);
 	void SetSceneMode(GAME_SCENE_MODE nSceneMode);
 	void ResetLevel1();
+	void ResetLevel2();
 	void ClampPlayerToTerrain();
 	void FirePlayerProjectile();
 	void FireLevel1EnemyProjectile(int nTargetIndex);
@@ -148,6 +150,10 @@ private:
 	void BuildLevel1Decorations(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList);
 	void RenderLevel1Decorations(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
 	void ReleaseLevel1Decorations();
+	void BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList);
+	void UpdateLevel2Objects(float fTimeElapsed);
+	void RenderLevel2Objects(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
+	void ReleaseLevel2Objects();
 	void BuildLevel1Effects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList);
 	void ResetLevel1Effects();
 	void UpdateLevel1Effects(float fTimeElapsed);
@@ -209,6 +215,11 @@ private:
 	int							m_nLevel1Decorations = 0;
 	CEffectObject				**m_ppLevel1Effects = NULL;
 	int							m_nLevel1Effects = 0;
+	CTerrainObject				*m_pLevel2Terrain = NULL;
+	CTankObject					**m_ppLevel2EnemyTanks = NULL;
+	int							m_nLevel2EnemyTanks = 0;
+	CGameObject					**m_ppLevel2Obstacles = NULL;
+	int							m_nLevel2Obstacles = 0;
 	CEffectObject				**m_ppStartNameExplosionEffects = NULL;
 	int							m_nStartNameExplosionEffects = 0;
 	int							m_nPlayerMaxHP = 100;

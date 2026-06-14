@@ -270,9 +270,11 @@ protected:
 	CGameObject* m_pTurretFrame = NULL;
 	CGameObject* m_pCannonFrame = NULL;
 	CGameObject* m_pGunFrame = NULL;
+	XMFLOAT4X4 m_xmf4x4TurretBaseTransform;
 
 public:
 	virtual void OnInitialize();
+	void AimTurretAt(const XMFLOAT3& xmf3TargetPosition);
 	virtual void Animate(float fTimeElapsed, XMFLOAT4X4* pxmf4x4Parent = NULL);
 };
 

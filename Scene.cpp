@@ -36,7 +36,8 @@ static const int HUD_ENEMY_GAUGE = 3;
 static const int MAX_ENEMY_PROJECTILES = 48;
 static const int LEVEL1_EFFECT_COUNT = 96;
 static const int START_NAME_EXPLOSION_EFFECT_COUNT = 32;
-
+static const int LEVEL2_ENEMY_TANK_COUNT = 10;
+static const int LEVEL2_OBSTACLE_COUNT = 60;
 CScene::CScene()
 {
 }
@@ -95,6 +96,7 @@ void CScene::SetSceneMode(GAME_SCENE_MODE nSceneMode)
 		::SetCursor(::LoadCursor(NULL, IDC_ARROW));
 	}
 	if (m_nSceneMode == GAME_SCENE_LEVEL1) ResetLevel1();
+	if (m_nSceneMode == GAME_SCENE_LEVEL2) ResetLevel2();
 	if (m_nSceneMode != GAME_SCENE_START)
 	{
 		m_bTitleHovered = false;
@@ -161,13 +163,45 @@ void CScene::ResetLevel1()
 	::OutputDebugStringA(pstrDebug);
 }
 
+void CScene::ResetLevel2()
+{
+	if (!m_pPlayer) return;
+
+	const float fStartX = 0.0f;
+	const float fStartZ = -280.0f;
+	const float fStartAltitude = 18.0f;
+	float fTerrainY = (m_pLevel2Terrain) ? m_pLevel2Terrain->GetHeight(fStartX, fStartZ) : 20.0f;
+	XMFLOAT3 xmf3StartPosition = XMFLOAT3(fStartX, fTerrainY + fStartAltitude, fStartZ);
+
+	m_pPlayer->ResetOrientation();
+	m_pPlayer->SetPosition(xmf3StartPosition);
+	m_pPlayer->SetVelocity(XMFLOAT3(0.0f, 0.0f, 0.0f));
+
+	CCamera *pLevel2Camera = m_pPlayer->ChangeCamera(THIRD_PERSON_CAMERA, 0.0f);
+	if (pLevel2Camera)
+	{
+		XMFLOAT3 xmf3PlayerPosition = m_pPlayer->GetPosition();
+		pLevel2Camera->SetPosition(Vector3::Add(xmf3PlayerPosition, pLevel2Camera->GetOffset()));
+		pLevel2Camera->SetLookAt(xmf3PlayerPosition);
+		pLevel2Camera->RegenerateViewMatrix();
+	}
+}
 void CScene::ClampPlayerToTerrain()
 {
-	if ((m_nSceneMode != GAME_SCENE_LEVEL1) || !m_pPlayer || !m_pTerrain) return;
+	if (!m_pPlayer) return;
 
-	const float fMinAltitude = 40.0f;
+	CTerrainObject *pCurrentTerrain = NULL;
+	float fMinAltitude = 40.0f;
+	if (m_nSceneMode == GAME_SCENE_LEVEL1) pCurrentTerrain = m_pTerrain;
+	else if (m_nSceneMode == GAME_SCENE_LEVEL2)
+	{
+		pCurrentTerrain = m_pLevel2Terrain;
+		fMinAltitude = 8.0f;
+	}
+	if (!pCurrentTerrain) return;
+
 	XMFLOAT3 xmf3PlayerPosition = m_pPlayer->GetPosition();
-	float fTerrainY = m_pTerrain->GetHeight(xmf3PlayerPosition.x, xmf3PlayerPosition.z);
+	float fTerrainY = pCurrentTerrain->GetHeight(xmf3PlayerPosition.x, xmf3PlayerPosition.z);
 	float fMinimumY = fTerrainY + fMinAltitude;
 	if (xmf3PlayerPosition.y < fMinimumY)
 	{
@@ -711,6 +745,144 @@ void CScene::ReleaseLevel1Decorations()
 	}
 	m_nLevel1Decorations = 0;
 }
+void CScene::BuildLevel2Objects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList)
+{
+	ReleaseLevel2Objects();
+
+	int pnTerrainMaterials[1] = { 1 };
+	m_pLevel2Terrain = new CTerrainObject(pd3dDevice, pd3dCommandList, "HeightMap/Level_2_terrain.raw");
+	m_pLevel2Terrain->CreateShaderVariables(pd3dDevice, pd3dCommandList, 1, pnTerrainMaterials);
+
+	FILE *pTankFile = NULL;
+	bool bUseTankModel = (fopen_s(&pTankFile, "Unused/M26.bin", "rb") == 0);
+	if (pTankFile) fclose(pTankFile);
+	FILE *pTreeFile = NULL;
+	bool bUseTreeModel = (fopen_s(&pTreeFile, "Model/Tree.bin", "rb") == 0);
+	if (pTreeFile) fclose(pTreeFile);
+	FILE *pRockFile = NULL;
+	bool bUseRockModel = (fopen_s(&pRockFile, "Model/Rock.bin", "rb") == 0);
+	if (pRockFile) fclose(pRockFile);
+	if (!bUseTankModel || !bUseTreeModel || !bUseRockModel)
+	{
+		::OutputDebugStringA("[Level2] Model load skipped: Unused/M26.bin, Model/Tree.bin, or Model/Rock.bin is missing.\n");
+		ReleaseLevel2Objects();
+		return;
+	}
+
+	m_nLevel2EnemyTanks = LEVEL2_ENEMY_TANK_COUNT;
+	m_ppLevel2EnemyTanks = new CTankObject*[m_nLevel2EnemyTanks];
+	for (int i = 0; i < m_nLevel2EnemyTanks; i++) m_ppLevel2EnemyTanks[i] = NULL;
+
+	const XMFLOAT3 xmf3TankPositions[LEVEL2_ENEMY_TANK_COUNT] =
+	{
+		XMFLOAT3(-360.0f, 0.0f, 120.0f), XMFLOAT3(-250.0f, 0.0f, 360.0f), XMFLOAT3(-120.0f, 0.0f, 620.0f), XMFLOAT3(80.0f, 0.0f, 520.0f), XMFLOAT3(280.0f, 0.0f, 310.0f),
+		XMFLOAT3(390.0f, 0.0f, 40.0f), XMFLOAT3(220.0f, 0.0f, -210.0f), XMFLOAT3(20.0f, 0.0f, -420.0f), XMFLOAT3(-190.0f, 0.0f, -260.0f), XMFLOAT3(-410.0f, 0.0f, -80.0f)
+	};
+	for (int i = 0; i < m_nLevel2EnemyTanks; i++)
+	{
+		int nMeshesInHierarchy = 0;
+		int pnMaterialsInHierarchy[64]{};
+		CGameObject *pTankModel = CGameObject::LoadGeometryFromFile(pd3dDevice, pd3dCommandList, m_pd3dGraphicsRootSignature, "Unused/M26.bin", &nMeshesInHierarchy, pnMaterialsInHierarchy);
+		CM26Object *pTankObject = new CM26Object();
+		pTankObject->CreateShaderVariables(pd3dDevice, pd3dCommandList, nMeshesInHierarchy, pnMaterialsInHierarchy);
+		pTankObject->SetChild(pTankModel, true);
+		pTankObject->OnInitialize();
+		pTankObject->SetScale(2.6f, 2.6f, 2.6f);
+		pTankObject->Rotate(0.0f, (float)(i * 31), 0.0f);
+		float fTankY = (m_pLevel2Terrain) ? m_pLevel2Terrain->GetHeight(xmf3TankPositions[i].x, xmf3TankPositions[i].z) : 0.0f;
+		pTankObject->SetPosition(XMFLOAT3(xmf3TankPositions[i].x, fTankY + 2.0f, xmf3TankPositions[i].z));
+		m_ppLevel2EnemyTanks[i] = pTankObject;
+	}
+
+	m_nLevel2Obstacles = LEVEL2_OBSTACLE_COUNT;
+	m_ppLevel2Obstacles = new CGameObject*[m_nLevel2Obstacles];
+	for (int i = 0; i < m_nLevel2Obstacles; i++) m_ppLevel2Obstacles[i] = NULL;
+
+	for (int i = 0; i < m_nLevel2Obstacles; i++)
+	{
+		bool bTree = ((i % 3) != 0);
+		float fColumn = (float)(i % 10);
+		float fRow = (float)(i / 10);
+		float x = -430.0f + fColumn * 95.0f + (float)((i * 17) % 31 - 15);
+		float z = -470.0f + fRow * 190.0f + (float)((i * 23) % 47 - 23);
+		float y = (m_pLevel2Terrain) ? m_pLevel2Terrain->GetHeight(x, z) : 0.0f;
+		float fScale = bTree ? (0.78f + (float)(i % 5) * 0.08f) : (0.72f + (float)(i % 4) * 0.10f);
+		float fYaw = fmodf((float)(i * 43), 360.0f);
+
+		int nMeshesInHierarchy = 0;
+		int pnMaterialsInHierarchy[64]{};
+		CGameObject *pObstacleModel = CGameObject::LoadGeometryFromFile(pd3dDevice, pd3dCommandList, m_pd3dGraphicsRootSignature, bTree ? "Model/Tree.bin" : "Model/Rock.bin", &nMeshesInHierarchy, pnMaterialsInHierarchy);
+		CGameObject *pObstacleObject = new CGameObject();
+		pObstacleObject->CreateShaderVariables(pd3dDevice, pd3dCommandList, nMeshesInHierarchy, pnMaterialsInHierarchy);
+		pObstacleObject->SetChild(pObstacleModel, true);
+		pObstacleObject->SetScale(fScale, fScale, fScale);
+		pObstacleObject->Rotate(0.0f, fYaw, 0.0f);
+		pObstacleObject->SetPosition(XMFLOAT3(x, y, z));
+		m_ppLevel2Obstacles[i] = pObstacleObject;
+	}
+}
+
+void CScene::UpdateLevel2Objects(float fTimeElapsed)
+{
+	if ((m_nSceneMode != GAME_SCENE_LEVEL2) || !m_pPlayer || !m_ppLevel2EnemyTanks) return;
+
+	XMFLOAT3 xmf3PlayerPosition = m_pPlayer->GetPosition();
+	for (int i = 0; i < m_nLevel2EnemyTanks; i++)
+	{
+		if (m_ppLevel2EnemyTanks[i]) m_ppLevel2EnemyTanks[i]->AimTurretAt(xmf3PlayerPosition);
+	}
+}
+
+void CScene::RenderLevel2Objects(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera)
+{
+	if (m_nSceneMode != GAME_SCENE_LEVEL2) return;
+
+	if (m_pLevel2Terrain)
+	{
+		m_pLevel2Terrain->UpdateTransform(NULL);
+		m_pLevel2Terrain->Render(pd3dCommandList, pCamera, m_pLevel2Terrain->m_ppd3dcbInstancingGameObjects, m_pLevel2Terrain->m_ppcbMappedInstancingGameObjects);
+	}
+	for (int i = 0; i < m_nLevel2Obstacles; i++)
+	{
+		if (m_ppLevel2Obstacles && m_ppLevel2Obstacles[i])
+		{
+			m_ppLevel2Obstacles[i]->UpdateTransform(NULL);
+			m_ppLevel2Obstacles[i]->Render(pd3dCommandList, pCamera, m_ppLevel2Obstacles[i]->m_ppd3dcbInstancingGameObjects, m_ppLevel2Obstacles[i]->m_ppcbMappedInstancingGameObjects);
+		}
+	}
+	for (int i = 0; i < m_nLevel2EnemyTanks; i++)
+	{
+		if (m_ppLevel2EnemyTanks && m_ppLevel2EnemyTanks[i])
+		{
+			m_ppLevel2EnemyTanks[i]->UpdateTransform(NULL);
+			m_ppLevel2EnemyTanks[i]->Render(pd3dCommandList, pCamera, m_ppLevel2EnemyTanks[i]->m_ppd3dcbInstancingGameObjects, m_ppLevel2EnemyTanks[i]->m_ppcbMappedInstancingGameObjects);
+		}
+	}
+}
+
+void CScene::ReleaseLevel2Objects()
+{
+	if (m_pLevel2Terrain)
+	{
+		m_pLevel2Terrain->Release();
+		m_pLevel2Terrain = NULL;
+	}
+	if (m_ppLevel2EnemyTanks)
+	{
+		for (int i = 0; i < m_nLevel2EnemyTanks; i++) if (m_ppLevel2EnemyTanks[i]) m_ppLevel2EnemyTanks[i]->Release();
+		delete[] m_ppLevel2EnemyTanks;
+		m_ppLevel2EnemyTanks = NULL;
+	}
+	m_nLevel2EnemyTanks = 0;
+	if (m_ppLevel2Obstacles)
+	{
+		for (int i = 0; i < m_nLevel2Obstacles; i++) if (m_ppLevel2Obstacles[i]) m_ppLevel2Obstacles[i]->Release();
+		delete[] m_ppLevel2Obstacles;
+		m_ppLevel2Obstacles = NULL;
+	}
+	m_nLevel2Obstacles = 0;
+}
+
 void CScene::BuildLevel1Effects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList)
 {
 	ReleaseLevel1Effects();
@@ -1087,6 +1259,8 @@ bool CScene::IsVisibleObject(int nObject) const
 {
 	if (m_nSceneMode == GAME_SCENE_START) return((nObject == UI_TITLE_OBJECT) || ((nObject == UI_NAME_OBJECT) && !m_bNameExploding));
 	if (m_nSceneMode == GAME_SCENE_MENU) return((nObject >= UI_TUTORIAL_OBJECT) && (nObject <= UI_END_OBJECT));
+	if (m_nSceneMode == GAME_SCENE_LEVEL2) return(false);
+
 	if (m_nSceneMode == GAME_SCENE_LEVEL1)
 	{
 		if (nObject == LEVEL1_CLEAR_OBJECT) return(m_bLevel1Cleared);
@@ -1219,6 +1393,7 @@ void CScene::BuildObjects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *p
 	m_ppGameObjects[WORLD_OBJECT_START + 4] = m_pTerrain;
 
 	BuildLevel1Decorations(pd3dDevice, pd3dCommandList);
+	BuildLevel2Objects(pd3dDevice, pd3dCommandList);
 	InitializeLevel1Targets();
 
 	m_nProjectiles = MAX_PROJECTILES;
@@ -1299,6 +1474,7 @@ void CScene::ReleaseObjects()
 	}
 
 	ReleaseLevel1Decorations();
+	ReleaseLevel2Objects();
 	ReleaseLevel1Effects();
 	ReleaseStartNameExplosionEffects();
 
@@ -1406,6 +1582,9 @@ void CScene::ReleaseShaderVariables()
 	for (int i = 0; i < m_nEnemyProjectiles; i++) if (m_ppEnemyProjectiles[i]) m_ppEnemyProjectiles[i]->ReleaseShaderVariables();
 	for (int i = 0; i < m_nHudBars; i++) if (m_ppHudBars[i]) m_ppHudBars[i]->ReleaseShaderVariables();
 	for (int i = 0; i < m_nLevel1Decorations; i++) if (m_ppLevel1Decorations[i]) m_ppLevel1Decorations[i]->ReleaseShaderVariables();
+	if (m_pLevel2Terrain) m_pLevel2Terrain->ReleaseShaderVariables();
+	for (int i = 0; i < m_nLevel2EnemyTanks; i++) if (m_ppLevel2EnemyTanks[i]) m_ppLevel2EnemyTanks[i]->ReleaseShaderVariables();
+	for (int i = 0; i < m_nLevel2Obstacles; i++) if (m_ppLevel2Obstacles[i]) m_ppLevel2Obstacles[i]->ReleaseShaderVariables();
 	for (int i = 0; i < m_nLevel1Effects; i++) if (m_ppLevel1Effects[i]) m_ppLevel1Effects[i]->ReleaseShaderVariables();
 	for (int i = 0; i < m_nStartNameExplosionEffects; i++) if (m_ppStartNameExplosionEffects[i]) m_ppStartNameExplosionEffects[i]->ReleaseShaderVariables();
 }
@@ -1417,6 +1596,9 @@ void CScene::ReleaseUploadBuffers()
 	for (int i = 0; i < m_nEnemyProjectiles; i++) if (m_ppEnemyProjectiles[i]) m_ppEnemyProjectiles[i]->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nHudBars; i++) if (m_ppHudBars[i]) m_ppHudBars[i]->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nLevel1Decorations; i++) if (m_ppLevel1Decorations[i]) m_ppLevel1Decorations[i]->ReleaseUploadBuffers();
+	if (m_pLevel2Terrain) m_pLevel2Terrain->ReleaseUploadBuffers();
+	for (int i = 0; i < m_nLevel2EnemyTanks; i++) if (m_ppLevel2EnemyTanks[i]) m_ppLevel2EnemyTanks[i]->ReleaseUploadBuffers();
+	for (int i = 0; i < m_nLevel2Obstacles; i++) if (m_ppLevel2Obstacles[i]) m_ppLevel2Obstacles[i]->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nLevel1Effects; i++) if (m_ppLevel1Effects[i]) m_ppLevel1Effects[i]->ReleaseUploadBuffers();
 	for (int i = 0; i < m_nStartNameExplosionEffects; i++) if (m_ppStartNameExplosionEffects[i]) m_ppStartNameExplosionEffects[i]->ReleaseUploadBuffers();
 }
@@ -1563,6 +1745,8 @@ void CScene::AnimateObjects(float fTimeElapsed)
 		if (m_ppGameObjects[i]) m_ppGameObjects[i]->Animate(fTimeElapsed, NULL);
 	}
 
+	if (m_nSceneMode == GAME_SCENE_LEVEL2) UpdateLevel2Objects(fTimeElapsed);
+
 	if (m_nSceneMode == GAME_SCENE_LEVEL1)
 	{
 		if (m_fProjectileFireCooldown > 0.0f) m_fProjectileFireCooldown -= fTimeElapsed;
@@ -1643,6 +1827,9 @@ void CScene::Render(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera
 	}
 
 	if (m_nSceneMode == GAME_SCENE_START) RenderStartNameExplosionEffects(pd3dCommandList, pCamera);
+
+
+	if (m_nSceneMode == GAME_SCENE_LEVEL2) RenderLevel2Objects(pd3dCommandList, pCamera);
 
 	if (m_nSceneMode == GAME_SCENE_LEVEL1)
 	{
