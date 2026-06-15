@@ -259,17 +259,16 @@ void CGameFramework::ChangeSwapChainState()
 	m_pdxgiSwapChain->GetFullscreenState(&bFullScreenState, NULL);
 	if (!bFullScreenState)
 	{
-		::GetWindowRect(m_hWnd, &m_rcWindowedRect);
-		m_bWindowedRectSaved = true;
 		m_pdxgiSwapChain->SetFullscreenState(TRUE, NULL);
 	}
 	else
 	{
 		m_pdxgiSwapChain->SetFullscreenState(FALSE, NULL);
-		if (m_bWindowedRectSaved)
-		{
-			::SetWindowPos(m_hWnd, HWND_NOTOPMOST, m_rcWindowedRect.left, m_rcWindowedRect.top, m_rcWindowedRect.right - m_rcWindowedRect.left, m_rcWindowedRect.bottom - m_rcWindowedRect.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-		}
+		const int nWindowWidth = 1280;
+		const int nWindowHeight = 760;
+		int nWindowX = (::GetSystemMetrics(SM_CXSCREEN) - nWindowWidth) / 2;
+		int nWindowY = (::GetSystemMetrics(SM_CYSCREEN) - nWindowHeight) / 2;
+		::SetWindowPos(m_hWnd, HWND_NOTOPMOST, nWindowX, nWindowY, nWindowWidth, nWindowHeight, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
 	}
 
 	DXGI_MODE_DESC dxgiTargetParameters;
